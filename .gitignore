@@ -1,2 +1,6 @@
+# macOS system files
 *.DS_Store
 .DS_Store
+
+# installation-specific configuration
+config.php
