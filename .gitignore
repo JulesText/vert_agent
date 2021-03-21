@@ -1,3 +1,10 @@
+# server files
+.ftpconfig
+.htaccess
+.ftpquota
+.ftpignore
+error_log
+
 # macOS system files
 *.DS_Store
 .DS_Store
