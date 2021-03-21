@@ -5,9 +5,22 @@
 .ftpignore
 error_log
 
-# macOS system files
-*.DS_Store
-.DS_Store
-
 # installation-specific configuration
 config.php
+
+# unwanted system files created by osx or windows
+# Compiled source #
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+# OS generated files #
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
