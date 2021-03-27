@@ -8,7 +8,10 @@ error_log
 # installation-specific configuration
 config.php
 
+#
 # unwanted system files created by osx or windows
+#
+
 # Compiled source #
 *.com
 *.class
@@ -16,6 +19,7 @@ config.php
 *.exe
 *.o
 *.so
+
 # OS generated files #
 .DS_Store
 .DS_Store?
