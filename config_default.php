@@ -5,7 +5,7 @@
 date_default_timezone_set('UTC');
 
 if (version_compare(phpversion(),"8.0.0",'>=')
-	|| version_compare(phpversion(),"7.0.0",'<'))
+|| version_compare(phpversion(),"7.0.0",'<'))
 	die ('requires php version 7.x.x, running ' . phpversion());
 
 ini_set('memory_limit', '64M'); # memory limit, set '-1' for unlimited, default 32M
@@ -33,8 +33,10 @@ $config['timestamp'] = (string) milliseconds();
 
 /* telegram settings */
 
-$config['chatId'] = 'chatId'; # default telegram chat id
-$config['chatPath'] = 'https://api.telegram.org/bot132'; # bot API path and key
+// bot name aaaaaa
+$config['chatPath'] = 'https://api.telegram.org/bot000000000:AAAAAAAAA_AAAAAAAA_AAAAAAAA'; # bot API path and key
+// user name aaaaaa
+$config['chatId'] = '111111111'; # chat id for bot and user
 $config['chatText'] = 'message failed';
 
 /* database arrays */
@@ -224,6 +226,13 @@ function config_exchange($config) {
 			$config['obs_hist_max'] = 1440;
 			# but full history for some, which are:
 			$config['hist_pairs'] = array('BTC/USDT', 'ETH/USDT', 'LTC/USDT', 'ETC/USDT', 'XRP/USDT', 'EOS/USDT', 'BCH/USDT', 'BSV/USDT', 'TRX/USDT');
+		break;
+
+		case 'etherscan':
+			$config['method'] = 'GET';
+			$config['api_key'] = '000';
+			$config['url'] = 'https://api.etherscan.io/api?';
+			$config['address_eth'] = '0x000';
 		break;
 
 		case 'uniswap':
