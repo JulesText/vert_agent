@@ -1,5 +1,62 @@
 
 --
+-- Explanation of tactics table fields
+--
+/*
+`strategy_id` is simply a backwards reference to the strategy the tactic belongs to
+`status` will change from:
+     conditional to actionable when all conditions are met (ie conditions = 1)
+     actionable to ordered when order is placed
+     ordered to executed when order is completed
+`refresh` is set to x minutes, to check tactic status and conditions no more than every x minutes
+`currency` is the last time the tactic status and conditions were checked
+`action_time_limit` is set to default 1440, so error message is generated and tactic cancelled if it has remained actionable for more than 1440 minutes (1 day)
+`condition_time_test` is set to 0 if waiting for time to arrive, otherwise 1
+`condition_time` is set to a point in the future
+`condition_tactic_test` is set to 0 if waiting for another tactic to execute, otherwise 1
+`condition_tactic` indicates other tactic to wait for
+`condition_pair_test` is set to 0 if waiting for a price indicator to pass a threshold, otherwise 1
+`condition_pair_id`, `condition_pair_currency_min`, `condition_pair_indicator`, `condition_pair_value_operand`, `condition_pair_value`, these define the price indicator
+`action`, `exchange`, `pair_asset`, `from_asset`, `from_amount`, `from_percent`, `to_asset`, `trade_price`, `to_fee_max`, these define the order, though note order is optional, some tactics will not have any order and only serve as dependency for another tactic
+`transaction_id` captures the transaction_id (order id) once it is placed
+*/
+
+--
+-- Table structure for table `tactics`
+--
+
+CREATE TABLE `tactics` (
+  `tactic_id` int(11) NOT NULL,
+  `strategy_id` int(11) NOT NULL,
+  `status` enum('inactive','conditional','actionable','ordered','executed','failed') NOT NULL DEFAULT 'inactive',
+  `refresh` int(8) NOT NULL,
+  `currency` bigint(20) NOT NULL,
+  `action_time_limit` int(8) NOT NULL DEFAULT '1440',
+  `condition_time_test` tinyint(1) NOT NULL DEFAULT '1',
+  `condition_time` bigint(20) DEFAULT NULL,
+  `condition_tactic_test` tinyint(1) NOT NULL DEFAULT '1',
+  `condition_tactic` int(11) DEFAULT NULL,
+  `condition_pair_test` tinyint(1) DEFAULT '1',
+  `condition_pair_id` int(11) DEFAULT NULL,
+  `condition_pair_currency_min` int(8) DEFAULT NULL,
+  `condition_pair_indicator` varchar(128) DEFAULT NULL,
+  `condition_pair_value_operand` enum('>=','<=','=') DEFAULT NULL,
+  `condition_pair_value` decimal(40,20) DEFAULT NULL,
+  `action` enum('delete','limit','market','none') NOT NULL DEFAULT 'none',
+  `exchange` char(32) DEFAULT NULL,
+  `pair_asset` varchar(64) DEFAULT NULL,
+  `from_asset` char(16) DEFAULT NULL,
+  `from_amount` decimal(30,20) DEFAULT NULL,
+  `from_percent` int(11) DEFAULT NULL,
+  `to_asset` char(16) DEFAULT NULL,
+  `trade_price` decimal(30,20) DEFAULT NULL,
+  `to_fee_max` int(11) DEFAULT NULL,
+  `transaction_id` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `assets`
 --
 
@@ -124,41 +181,6 @@ CREATE TABLE `strategies` (
   `objective` varchar(4112) NOT NULL,
   `gain` decimal(5,2) NOT NULL DEFAULT '0.00',
   `reflection` varchar(4112) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `tactics`
---
-
-CREATE TABLE `tactics` (
-  `tactic_id` int(11) NOT NULL,
-  `strategy_id` int(11) NOT NULL,
-  `status` enum('inactive','conditional','actionable','ordered','executed','failed') NOT NULL DEFAULT 'inactive',
-  `refresh` int(8) NOT NULL,
-  `currency` bigint(20) NOT NULL,
-  `action_time_limit` int(8) NOT NULL DEFAULT '1440',
-  `condition_time_test` tinyint(1) NOT NULL DEFAULT '1',
-  `condition_time` bigint(20) DEFAULT NULL,
-  `condition_tactic_test` tinyint(1) NOT NULL DEFAULT '1',
-  `condition_tactic` int(11) DEFAULT NULL,
-  `condition_pair_test` tinyint(1) DEFAULT '1',
-  `condition_pair_id` int(11) DEFAULT NULL,
-  `condition_pair_currency_min` int(8) DEFAULT NULL,
-  `condition_pair_indicator` varchar(128) DEFAULT NULL,
-  `condition_pair_value_operand` enum('>=','<=','=') DEFAULT NULL,
-  `condition_pair_value` decimal(40,20) DEFAULT NULL,
-  `action` enum('delete','limit','market','none') NOT NULL DEFAULT 'none',
-  `exchange` char(32) DEFAULT NULL,
-  `pair_asset` varchar(64) DEFAULT NULL,
-  `from_asset` char(16) DEFAULT NULL,
-  `from_amount` decimal(30,20) DEFAULT NULL,
-  `from_percent` int(11) DEFAULT NULL,
-  `to_asset` char(16) DEFAULT NULL,
-  `trade_price` decimal(30,20) DEFAULT NULL,
-  `to_fee_max` int(11) DEFAULT NULL,
-  `transaction_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
 -- --------------------------------------------------------

@@ -52,14 +52,6 @@ function actionable_tactics($config, $tactic_id = FALSE) {
 				$order_query['side'] = 'buy';
 			}
 
-			if (!empty($t['from_amount'])) {
-				$order_query['orderQty'] = $t['from_amount'];
-			} elseif (!empty($t['from_percent'])) {
-				# to do:
-				# if percent is defined instead of amount,
-				# query available funds on exchange and calculate trade amount from percent
-			}
-
 			if ($order_query['orderType'] == 'limit') $order_query['orderPrice'] = $t['trade_price'];
 
 			switch($t['exchange']) {
@@ -80,52 +72,124 @@ function actionable_tactics($config, $tactic_id = FALSE) {
 
 			}
 
-			# place order
-			$result = place_order($config, $order_query, $orderId = '');
-			#var_dump($result);
+			//  check for available funds on okex, since we only expect orders on okex
+			$config['exchange'] = 'okex';
+			$config['method'] = 'GET';
 
-			# process response of order placed success
-			if ($result['res']['placed']) {
+// $config = config_exchange($config);
+// $config['api_request'] = '/api/spot/v3/orders?instrument_id=ETH-USDT&state=7';
+// $config['url'] .= $config['api_request'];
+// $transactions = info($config);
 
-				# slight risk order is placed but response not received
-				# could check number of open orders matches number in tactics and/or transactions
-				# ignore risk for now
+			$config = config_exchange($config);
+			$config['api_request'] = '/api/spot/v3/instruments';
+			$config['url'] .= $config['api_request'];
 
-				# record order in transactions table
-				$query = "
-					INSERT INTO transactions
-					(exchange, exchange_transaction_id)
-					VALUES
-					('" . $t['exchange'] . "', '" . $result['res']['exchange_transaction_id'] . "')
-				";
-				query($query, $config);
+			//find minimum amount, minimum size increment amount
+			$result = info($config);
+			$pair = array_values(array_filter($result, function ($currency_pair) use ($order_query) {
+					return $currency_pair['instrument_id'] == str_replace('/', '-', $order_query['symbol']);
+			}))[0];
 
-				# record order in tactics table
-				$query = "
-					SELECT transaction_id FROM transactions
-					WHERE exchange = '" . $t['exchange'] . "'
-					AND exchange_transaction_id = '" . $result['res']['exchange_transaction_id'] . "'
-				";
-				$id = query($query, $config);
+			$config = config_exchange($config);
+			$config['api_request'] = '/api/spot/v3/accounts';
+			$config['url'] .= $config['api_request'];
 
-				$query = "
-					UPDATE tactics SET
-					status = 'ordered',
-					currency = " . $config['timestamp'] . ",
-					transaction_id = " . $id[0]['transaction_id'] . "
-					WHERE tactic_id = " . $t['tactic_id']
-				;
-				query($query, $config);
+			$result = info($config);
+			$wallets = array_column($result, 'currency');
+			$available = array_column($result, 'available');
+			$balances = array_combine($wallets, $available);
+			$walletBalance = $balances[$t['from_asset']];
 
-				# note that we can leave order history to update itself
+			if (!empty($t['from_percent'])) {
+					$order_query['orderQty'] = closest_multiple(($t['from_percent'] / 100) * $walletBalance, $pair['tick_size']);
+			} elseif (!empty($t['from_amount'])) {
+					$order_query['orderQty'] = $t['from_amount'];
+			}
 
+			if ($order_query['orderQty'] > $walletBalance) {
+					//report wrong order amount
+					$config['chatText'] = 'order attempt failed for tactic_id because transaction amount (' . floatval($order_query['orderQty']) . ') is more than available balance (' . floatval($walletBalance) . ')';
+					telegram($config);
+			} else if ($order_query['orderQty'] < $pair['min_size']) {
+					//report wrong order amount
+					$config['chatText'] = 'order attempt failed for tactic_id because transaction amount (' . rtrim($order_query['orderQty'], "0") . ') is less than min size for asset pair(' . rtrim($pair['min_size'], "0") . ')';
+					telegram($config);
+			} else if (($order_query['orderQty'] / $pair['tick_size']) % 1 != 0) {
+					//report wrong order amount
+					$config['chatText'] = 'order attempt failed for tactic_id because transaction amount (' . rtrim($order_query['orderQty'], "0") . ') failed min_increment for asset pair(' . rtrim($pair['size_increment'], "0") . ')';
+					telegram($config);
 			} else {
 
-				# process response of order placed failure
-				# if an order fails send a message to telegram
-				# next time actionable_tactics function is called, bot will try to place order again
-				$config['chatText'] = 'order attempt failed for tactic_id ' . $t['tactic_id'];
-				telegram($config);
+				$config = config_exchange($config);
+
+				# place order
+				$result = place_order($config, $order_query, $orderId = '');
+
+				# process response of order placed success
+				if ($result['res']['placed']) {
+
+					# slight risk order is placed but response not received
+					# could check number of open orders matches number in tactics and/or transactions
+					# ignore risk for now
+
+					# record order in transactions table
+					$query = "
+						INSERT INTO transactions
+						(
+						investment_id,
+						strategy_id,
+						time_opened,
+						time_closed,
+						percent_complete,
+						exchange,
+						exchange_transaction_id,
+						pair_asset,
+						pair_price
+						)
+						VALUES
+						(
+						'0',
+						'" . $t['strategy_id'] . "',
+						'0',
+						'0',
+						'0',
+						'" . $t['exchange'] . "',
+						'" . $result['res']['exchange_transaction_id'] . "',
+						'" . $order_query['symbol'] . "',
+						'0'
+						)
+					";
+					query($query, $config);
+
+					# record order in tactics table
+					$query = "
+						SELECT transaction_id FROM transactions
+						WHERE exchange = '" . $t['exchange'] . "'
+						AND exchange_transaction_id = '" . $result['res']['exchange_transaction_id'] . "'
+					";
+					$id = query($query, $config);
+
+					$query = "
+						UPDATE tactics SET
+						status = 'ordered',
+						currency = " . $config['timestamp'] . ",
+						transaction_id = " . $id[0]['transaction_id'] . "
+						WHERE tactic_id = " . $t['tactic_id']
+					;
+					query($query, $config);
+
+					# note that we can leave order history to update itself
+
+				} else {
+
+					# process response of order placed failure
+					# if an order fails send a message to telegram
+					# next time actionable_tactics function is called, bot will try to place order again
+					$config['chatText'] = 'order attempt failed for tactic_id ' . $t['tactic_id'] . ", reason: " . $result['res']['message'];
+					telegram($config);
+
+				}
 
 			}
 
@@ -346,6 +410,9 @@ function ordered_tactics($config, $tactic_id = FALSE) {
 		if (!empty($t['transaction_id'])) {
 
 			$order = check_transaction($config, $t['transaction_id']);
+
+			if ($order === FALSE)
+				continue 1;
 
 		} else {
 

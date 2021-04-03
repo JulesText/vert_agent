@@ -77,7 +77,7 @@ function place_order($config, $order_query, $orderId = '') {
 			}
 			$config['method'] = 'POST';
 			$config['api_request'] = $config['order'] . json_encode($order, JSON_UNESCAPED_SLASHES);
-			$config['url'] .= $config['order'];
+			$config['url'] .= $config['api_request'];
 		break;
 
 	}
@@ -138,9 +138,11 @@ function cancel_order($config, $order_query) {
 		case 'okex':
 			$config['method'] = 'POST';
 			$order['instrument_id'] = str_replace('/', '-', $order_query['symbol']);
-			$config['api_request'] = $config['delete'] . $order_query['orderId'];
+			$config['api_request'] =
+				$config['delete'] .
+				$order_query['orderId'] .
+				json_encode($order, JSON_UNESCAPED_SLASHES);
 			$config['url'] .= $config['api_request'];
-			$config['api_request'] .= json_encode($order, JSON_UNESCAPED_SLASHES);
 		break;
 	}
 

@@ -56,38 +56,47 @@ function check_transaction($config, $transaction_id) {
 				$t[0]['exchange_transaction_id'] .
 				'?instrument_id=' . str_replace('/', '-', $t[0]['pair_asset'])
 			;
-			$config['url'] .=
-				$config['orders_status'] .
-				$t[0]['exchange_transaction_id']
-			;
+			$config['url'] .= $config['api_request'];
 		break;
 	}
 
-	$transaction = info($config);
+	if($t[0]['pair_asset']) {
 
-	if ($t[0]['exchange'] == 'bitmax') {
-		if ($transaction['code'] !== 0) {
-			return FALSE;
-		} else {
-			$transaction = $transaction[0]['data'];
-		}
-	}
+		$transaction = info($config);
 
-	if ($t[0]['exchange'] == 'okex') {
-		if ($transaction['error_code'] !== 0) {
-			return FALSE;
+		if ($t[0]['exchange'] == 'bitmax') {
+			if ($transaction['code'] !== 0 && isset($transaction['code'])) {
+				$config['chatText'] = 'Error ' . $transaction['code'] . ' on bitmax for transaction_id ' . $transaction_id;
+				telegram($config);
+				return FALSE;
+			} else {
+				$transaction = $transaction[0]['data'];
+			}
 		}
+
+		if ($t[0]['exchange'] == 'okex') {
+			if ($transaction['error_code'] !== 0 && isset($transaction['error_code'])) {
+				$config['chatText'] = 'Error ' . $transaction['error_code'] . ' on okex for transaction_id ' . $transaction_id;
+				telegram($config);
+				return FALSE;
+			}
+		}
+
+		$transaction['exchange'] = $t[0]['exchange'];
+
+		/* map array to exchange-specific format */
+		$transaction = map_transaction(array(), $transaction, $config);
+		query('update_transaction', $config, $transaction);
+
+		return $transaction;
+
 	} else {
-		$transaction = $transaction[0];
+
+		$config['chatText'] = 'Invalid pair_asset for transaction_id ' . $transaction_id;
+		telegram($config);
+		return FALSE;
+
 	}
-
-	$transaction['exchange'] = $t[0]['exchange'];
-
-	/* map array to exchange-specific format */
-	$transaction = map_transaction('', $transaction, $config);
-	query('update_transaction', $config, $transaction);
-
-	return $transaction;
 
 }
 
@@ -165,7 +174,7 @@ function process_transaction($config, $existing, $order) {
 
 	// map order id only, not other order details
 	// note that $order_id_only = TRUE
-	$order = map_transaction('', $order, $config, TRUE);
+	$order = map_transaction(array(), $order, $config, TRUE);
 
 	// if transaction exists in database, use existing record
 	$exists = FALSE;
@@ -282,11 +291,15 @@ function map_transaction($values, $order, $config, $order_id_only = FALSE) {
 				$quantity = $order['size'];
 				$filled = $order['filled_size'];
 			} elseif ($order['type'] == 'market') {
-				$quantity = $order['notional'];
+				if ($order['status'] == 'filled') {
+					$quantity = $order['filled_notional'];
+				} else {
+					$quantity = $order['notional'];
+				}
 				$filled = $order['filled_notional'];
 			}
 			$avg_price = $order['price_avg'];
-			$fee = ABS($order['fee']);
+			$fee = abs($order['fee']);
 			$fee_asset = $order['fee_currency'];
 			$direction = $order['side'];
 		break;

@@ -4,6 +4,9 @@
 
 function technical_analysis($config, $pair_id = FALSE) {
 
+	# values in the returned arrays from trader will be rounded to this precision
+	ini_set('trader.real_precision', '18');
+
 	$query = "SELECT DISTINCT pair, period, source, currency, history_start FROM asset_pairs WHERE analyse";
 	if ($pair_id) $query .= " AND pair_id = " . $pair_id;
 	$pairs = query($query, $config);
@@ -116,6 +119,7 @@ function technical_analysis($config, $pair_id = FALSE) {
 
 		foreach ($roc as $n) {
 			$r = trader_roc($dc, $n);
+			var_dump($r);
 			for ($i = 0; $i < $count; $i++) {
 				if (isset($r[$i]))
 					$hist[$i]['roc'.$n] = $r[$i];

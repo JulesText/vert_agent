@@ -146,7 +146,7 @@ function price_query($config, $pq) {
 					$values['high'] = $price['high'];
 					$values['low'] = $price['low'];
 					$values['close'] = $price['close'];
-					$values['volume'] = $price['volume'];
+					$values['volume'] = isset($price['volume']) ? $price['volume'] : 0;
 				}
 
 				if ($config['exchange'] == 'bitmax') {
@@ -428,17 +428,21 @@ function price_history($config, $pair_id = FALSE) {
 		switch ($config['exchange']) {
 
 			case 'okex':
-				if ((milliseconds() - $pq['start']) / $pq['period_ms'] > $config['obs_hist_max']) {
+				$obs_request = (milliseconds() - $pq['start']) / $pq['period_ms'];
+				if ($obs_request > $config['obs_hist_max']) {
 					# check if longer history available
 					if (in_array($pair['pair'], $config['hist_pairs'])) {
 						$pq['hist_long'] = TRUE;
 					} else {
 						$config['chatText'] =
 							'requested price history too long for pair_id ' . $pair['pair_id'] .
-							', you need to manually define earliest query in asset_pairs table'
+							', ' . $obs_request . ' observations requested, only ' .
+							$config['obs_hist_max'] . ' provided by API, ' .
+							'you need to disable collection flag in asset_pairs table'
 						;
 						telegram($config);
 						echo $config['chatText'] . PHP_EOL;
+						echo '(' . milliseconds() . ' - ' . $pq['start'] . ') / ' . $pq['period_ms'] . ' > ' . $config['obs_hist_max'];
 						continue 2; # continue to next iteration in nearest containing loop (value is +1 when inside 'switch' but not 'if' statement, as of php 7.3)
 					}
 				}
@@ -566,7 +570,7 @@ function price_recent($config, $pair_id = FALSE) {
 		# define time parameters
 		$i = floor((milliseconds() - $pq['start']) / $pq['period_ms']);
 		if ($i > $config['obs_curr_max']) $i = $config['obs_curr_max'];
-		$pq['stop'] = $pq['start'] + $i * $pq['period_ms'];
+		$pq['stop'] = intval($pq['start'] + $i * $pq['period_ms']);
 
 		# exit if time period incorrect
 		if ($pq['start'] >= $pq['stop']) continue 1;
@@ -618,8 +622,8 @@ function price_missing($config, $history, $pq) {
 			# define the last missing record in the sequence, could be the same as the first
 			$to = $hist[$i] - $pq['period_ms'];
 			# query the API for the missing record(s)
-			$pq['start'] = $from;
-			$pq['stop'] = $to;
+			$pq['start'] = min($from, $to);
+			$pq['stop'] = max($to, $from);
 			price_query($config, $pq);
 			# check if missing record is returned
 			$query_sub = "

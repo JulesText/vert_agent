@@ -81,9 +81,10 @@ function http_headers($config, $default = FALSE) {
 			break;
 
 			case 'okex':
-				#$timestamp = date('Y-m-d\TH:i:s.000', $config['timestamp'] / 1000) . 'Z'; # ISO 8601 standard format with Z
+				$date =  new DateTime();
+				$timestamp = $date->format('Y-m-d\TH:i:s\.000\Z'); # ISO 8601 standard format with Z
 				$config['msg'] =
-					(string) $config['timestamp'] .
+					$timestamp .
 					$config['method'] .
 					$config['api_request']
 				;
@@ -93,7 +94,7 @@ function http_headers($config, $default = FALSE) {
 					'Content-Type: ' . $config['content_type'],
 					'ok-access-key: ' . $config['api_key'],
 					'ok-access-sign: ' . $config['signature'],
-					'ok-access-timestamp: ' . $config['timestamp'] / 1000,
+					'ok-access-timestamp: ' . $timestamp,
 					'ok-access-passphrase: ' . $config['pass']
 					#'OK-TEXT-TO-SIGN: ' . $config['msg']
 				);

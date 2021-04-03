@@ -18,8 +18,6 @@ function query($querylabel, $config, $values=NULL) {
 		print_r($values) . PHP_EOL;
 		echo "Result: ";
 		print_r($result) . PHP_EOL;
-		echo "Config: ";
-		var_dump($config) . PHP_EOL;
 	}
 
 	return $result;
