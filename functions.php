@@ -81,7 +81,7 @@ function http_headers($config, $default = FALSE) {
 			break;
 
 			case 'okex':
-				$date =  new DateTime();
+				$date = new DateTime();
 				$timestamp = $date->format('Y-m-d\TH:i:s\.000\Z'); # ISO 8601 standard format with Z
 				$config['msg'] =
 					$timestamp .
