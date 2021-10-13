@@ -1,62 +1,29 @@
 <?php
 
-/* REST API class */
-class APIREST {
+/* function response handling */
 
-	private $url;
-	public $log;
-	public function __construct($url) {
-		$this->url = $url;
+function process($response, $config) {
+
+	/* print notification on screen */
+	if ($response['msg'] !== '' && !$response['die']) echo $response['msg'] . PHP_EOL;
+
+	/* send notification message to alert bot */
+	if ($response['alert']) {
+		// if api returns html, this will throw an error
+		$response['msg'] = strip_tags($response['msg']);
+		$config['url'] =
+			$config['chat_url'] .
+			'/sendMessage?chat_id=' . $config['chat_id'] .
+			'&parse_mode=html&text=' . urlencode($response['msg']) # urlencode handles line breaks
+		;
+		query_api($config, $default_headers = TRUE);
 	}
 
-	/**
-	* @param $httpheader array of headers
-	* @return response
-	*/
-	public function call($httpheader, $method, $query = NULL) {
+	/* terminate all processes after recording error */
+	if ($response['die']) error($response['msg']);
 
-		try {
-
-			$curl = curl_init();
-			if (FALSE === $curl)
-				throw new Exception('Failed to initialize');
-
-			$verbose = fopen('api_log', 'w+');
-			$curl_opt = array(
-				CURLOPT_URL => $this->url,
-				CURLOPT_RETURNTRANSFER => true,
-				CURLOPT_ENCODING => "",
-				CURLOPT_MAXREDIRS => 10,
-				CURLOPT_TIMEOUT => 60, /* number of seconds to wait for response */
-				CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-				CURLOPT_CUSTOMREQUEST => $method,
-				CURLOPT_POSTFIELDS => $query,
-				CURLOPT_HTTPHEADER => $httpheader,
-				CURLOPT_VERBOSE => true,
-				CURLOPT_STDERR => $verbose
-			);
-			curl_setopt_array($curl, $curl_opt);
-
-			$response = curl_exec($curl);
-			rewind($verbose);
-			$this->log = stream_get_contents($verbose);
-			if (FALSE === $response)
-				throw new Exception(curl_error($curl), curl_errno($curl));
-
-			$http_status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-
-			if (200 != $http_status)
-				throw new Exception($response, $http_status);
-			curl_close($curl);
-
-		} catch(Exception $e) {
-			$response= $e->getCode() . $e->getMessage();
-			echo $response;
-		}
-
-		return $response;
-	}
 }
+
 
 /* get timestamp */
 
@@ -67,13 +34,74 @@ function milliseconds() {
 
 }
 
-/* encrypt key */
+/*
+unix timestamp to date and time
+milliseconds in 13-digits
+*/
 
-function hmac($msg, $secret) {
+function unixtime_datetime($unixtime_ms, $format = 'print') {
 
-	$hmac = hash_hmac('sha256', $msg, $secret, true);
-	$hmac = base64_encode($hmac);
-	return $hmac;
+	$unixtime_ms = (int)$unixtime_ms;
+	$unixtime = number_format($unixtime_ms / 1000, 3, '.', '');
+	$ms = number_format($unixtime - floor($unixtime), 3, '.', '');
+	$ms = ltrim($ms, '0');
+
+	switch ($format) {
+
+		case 'iso':
+			# to ISO8601 date and time format
+			# 'T' denotes time
+			# 'Z' denotes UTC timezone (zero offset)
+			$datetime = date('Y-m-d\TH:i:s\\' . $ms . '\Z', $unixtime);
+		break;
+
+		case 'sql':
+			# MySQL format
+			$datetime = date('Y-m-d H:i:s\\' . $ms, $unixtime);
+		break;
+
+		case 'print':
+			# print format
+			$unixtime = floor($unixtime);
+ 			$unixtime_ms = $unixtime * 1000;
+			$datetime = date('Y-m-d H:i:s', $unixtime);
+		break;
+
+	}
+
+	$check = datetime_unixtime($datetime);
+	if ($check == $unixtime_ms) {
+		return $datetime;
+	} else {
+		error(
+			'error in unixtime_datetime, ' .
+			$check . ' !== ' .
+			$unixtime_ms .
+			' for datetime ' . $datetime
+		);
+	}
+
+}
+
+/*
+date and time (must have 3 trailing decimal places including zeros)
+to unix timestamp (milliseconds in 13-digits)
+$datetime in MySQL + milliseconds as decimal of seconds
+*/
+
+function datetime_unixtime($datetime) {
+
+	$unixtime = strtotime($datetime);
+	$pos = strpos($datetime, '.');
+	if ($pos) {
+		$ms = substr($datetime, $pos);
+	} else {
+		$ms = '.000';
+	}
+	if (substr($ms, 0, 1) !== '.') error('error in datetime_unixtime, $datetime does not have 3 trailing decimal places');
+	$unixtime_ms = ($unixtime + $ms) * 1000;
+
+	return $unixtime_ms;
 
 }
 
@@ -82,11 +110,19 @@ function hmac($msg, $secret) {
 function countdim($array) {
 
 	if (is_array(reset($array))) {
-		$return = countdim(reset($array)) + 1;
+		$count = countdim(reset($array)) + 1;
 	} else {
-		$return = 1;
+		$count = 1;
 	}
-	return $return;
+	return $count;
+
+}
+
+/* deduplicate multidimensional array */
+
+function dedupe_array($array) {
+
+	return array_map('unserialize', array_unique(array_map('serialize', $array)));
 
 }
 
@@ -108,27 +144,87 @@ function weekends($class) {
 
 /* count number of observations falling on weekends */
 
-function count_on_weekends($from, $to, $period_ms) {
+function nobs_weekends($from, $to, $period_ms) {
 
-	$wmiss = 0;
+	$nobs = 0;
 	for ($j = $from; $j <= $to; $j += $period_ms) {
 		$day = date('l', $j / 1000);
-		if (!($day == 'Sunday' || $day == 'Monday')) $wmiss++;
+		if ($day == 'Saturday' || $day == 'Sunday') $nobs++;
 	}
-	return $wmiss;
+	return $nobs;
 
 }
 
-/* calculate the smallest multiple of x closest to a given number,
-useful for calculating closest price that fits min size increment */
+/* calculate the smallest multiple of x closest to a given number n, always rounding down
+useful for calculating closest price/amount that fits exchange parameters */
 
-function closest_multiple($n, $x) {
+function lower_multiple($n, $x) {
 
-	if($x > $n)
-		return $x;
-
-	$n = $n + $x / 2;
 	$n = $n - fmod($n, $x);
+	$n = number_format($n, decimals($x), '.', '');
+
 	return $n;
+
+}
+
+/* count number of decimal places */
+
+function decimals($d) {
+
+	$i = strlen(substr(strrchr($d, "."), 1));
+
+	return $i;
+
+}
+
+/* write error to log and terminate */
+
+function error($msg) {
+
+	$log = fopen('error_log', 'a');
+	fwrite($log, $msg . PHP_EOL);
+	fclose($log);
+	die($msg);
+
+}
+
+/* convert unix timestamps to date time format */
+
+function convert_timestamps($config) {
+
+	$response = $config['response'];
+
+	$array = array(
+		array('table' => 'assets', 'from' => 'timestamp', 'to' => 'timestamp_dt', 'replace' => 1),
+		array('table' => 'asset_pairs', 'from' => 'currency_start', 'to' => 'currency_start_dt', 'replace' => 1),
+		array('table' => 'asset_pairs', 'from' => 'currency_end', 'to' => 'currency_end_dt', 'replace' => 1),
+		array('table' => 'asset_pairs', 'from' => 'history_start', 'to' => 'history_start_dt', 'replace' => 1),
+		array('table' => 'asset_pairs', 'from' => 'history_end', 'to' => 'history_end_dt', 'replace' => 1),
+		array('table' => 'price_history', 'from' => 'timestamp', 'to' => 'timestamp_dt', 'replace' => 0),
+		array('table' => 'tactics', 'from' => 'currency', 'to' => 'currency_dt', 'replace' => 1),
+		array('table' => 'tactics', 'from' => 'condition_time', 'to' => 'condition_time_dt', 'replace' => 1),
+		array('table' => 'tactics_external', 'from' => 'timestamp', 'to' => 'timestamp_dt', 'replace' => 0),
+		array('table' => 'transactions', 'from' => 'time_opened', 'to' => 'time_opened_dt', 'replace' => 0),
+		array('table' => 'transactions', 'from' => 'time_closed', 'to' => 'time_closed_dt', 'replace' => 0),
+		array('table' => 'web_content', 'from' => 'timestamp', 'to' => 'timestamp_dt', 'replace' => 1)
+	);
+
+	$response['count'] = 0;
+	foreach ($array as $a) {
+		$query = "
+			UPDATE " . $a['table'] . "
+			SET " . $a['to'] . " =
+				CASE
+				WHEN " . $a['from'] . " = 0 THEN NULL
+				ELSE from_unixtime((" . $a['from'] . " / 1000))
+				END
+		";
+		if (!$a['replace']) $query .= " WHERE ISNULL(" . $a['to'] . ") ";
+		$response['count'] += query($query, $config);
+	}
+
+	$response['msg'] .= 'refreshed: ' . $response['count'] . ' datetime records from timestamps' . PHP_EOL;
+
+	return $response;
 
 }

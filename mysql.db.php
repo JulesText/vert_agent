@@ -9,15 +9,17 @@ function query($querylabel, $config, $values=NULL) {
 	$query = getsql($config, $values, $querylabel);
 
 	# perform query
-	$result=doQuery($query, $config);
+	$result = doQuery($query, $config);
 
 	# for testing only: display query
 	if ($config['debug_sql']) {
-		echo "Query: ". $querylabel . PHP_EOL;
-		echo "Values: ";
-		print_r($values) . PHP_EOL;
-		echo "Result: ";
-		print_r($result) . PHP_EOL;
+		$response = $config['response'];
+		$response['msg'] .=
+			'Query: ' . $querylabel . PHP_EOL .
+			'Values: ' . var_export($values, TRUE) . PHP_EOL .
+			'Result: ' . var_export($result, TRUE) . PHP_EOL
+		;
+		process($response);
 	}
 
 	return $result;
@@ -66,7 +68,7 @@ function safeIntoDB(&$value, $key, $config) {
 
 	} else {
 
-		# don't clean filters - we've cleaned those separately in the sqlparts function
+		# don't clean filters
 		if (
 			strpos($key,'filterquery') === FALSE
 			&& !preg_match("/^'\d\d\d\d-\d\d-\d\d'$/",$value)

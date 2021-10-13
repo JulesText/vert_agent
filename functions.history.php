@@ -1,31 +1,33 @@
 <?php
 
-/* create api request string for order history for selected exchange */
+/* create api request for order history for selected exchange */
 
-function history_orders($config) {
+function history_orders($config, $condition) {
 
 	// make query string
 	switch ($config['exchange']) {
-		case 'bitmax':
-			$config['api_request'] = 'order/hist/current';
+		case 'ascendex':
+			$config['api_request'] = $config['order_history_hash'];
 			$config['url'] .=
 				$config['group'] .
 				$config['order_history'] .
 				'?n=1000&symbol=' .
-				$config['pair']
+				$config['pair'] .
+				$condition
 			;
 		break;
-		case 'okex':
+		case 'okex_spot':
+		case 'okex_margin':
 			$config['api_request'] =
-				'/api/spot/v3/orders' .
-				'?instrument_id=' . str_replace('/', '-', $config['pair'])
-				. '&state=2'
+				$config['order_history'] .
+				'?instrument_id=' . str_replace('/', '-', $config['pair']) .
+				$condition
 			;
 			$config['url'] .= $config['api_request'];
 		break;
 	}
 
-	return info($config);
+	return query_api($config);
 
 }
 
@@ -33,16 +35,18 @@ function history_orders($config) {
 
 function check_transaction($config, $transaction_id) {
 
+	$response = $config['response'];
+
 	$values = array();
 	$values['filterquery'] = " WHERE transaction_id = " . $transaction_id;
-	$t = query('get_transactions', $config, $values);
+	$t = query('select_transactions', $config, $values);
 
 	$config['exchange'] = $t[0]['exchange'];
 	$config = config_exchange($config);
 	$config['method'] = 'GET';
 
 	switch($t[0]['exchange']) {
-		case 'bitmax':
+		case 'ascendex':
 			$config['api_request'] = 'order/status';
 			$config['url'] .=
 				$config['group'] .
@@ -50,178 +54,327 @@ function check_transaction($config, $transaction_id) {
 				'?orderId=' . $t[0]['exchange_transaction_id']
 			;
 		break;
-		case 'okex':
+		case 'okex_spot':
+		case 'okex_margin':
 			$config['api_request'] =
 				$config['orders_status'] .
 				$t[0]['exchange_transaction_id'] .
-				'?instrument_id=' . str_replace('/', '-', $t[0]['pair_asset'])
+				'?instrument_id=' . str_replace('/', '-', $t[0]['pair'])
 			;
 			$config['url'] .= $config['api_request'];
 		break;
 	}
 
-	if($t[0]['pair_asset']) {
+	if($t[0]['pair']) {
 
-		$transaction = info($config);
+		$transaction = query_api($config);
 
-		if ($t[0]['exchange'] == 'bitmax') {
+		if ($t[0]['exchange'] == 'ascendex') {
 			if ($transaction['code'] !== 0 && isset($transaction['code'])) {
-				$config['chatText'] = 'Error ' . $transaction['code'] . ' on bitmax for transaction_id ' . $transaction_id;
-				telegram($config);
-				return FALSE;
+				$response['msg'] .= 'Error ' . $transaction['code'] . ' on ascendex for transaction_id ' . $transaction_id . PHP_EOL;
+				$response['alert'] = TRUE;
+				$response['error'] = TRUE;
+				return $response;
 			} else {
 				$transaction = $transaction[0]['data'];
 			}
 		}
 
-		if ($t[0]['exchange'] == 'okex') {
-			if ($transaction['error_code'] !== 0 && isset($transaction['error_code'])) {
-				$config['chatText'] = 'Error ' . $transaction['error_code'] . ' on okex for transaction_id ' . $transaction_id;
-				telegram($config);
-				return FALSE;
+		if ($t[0]['exchange'] == 'okex_spot' || $t[0]['exchange'] == 'okex_margin') {
+			if (isset($transaction['error_code']) && $transaction['error_code'] !== 0) {
+				$response['msg'] .= 'Error ' . $transaction['error_code'] . ' on okex for transaction_id ' . $transaction_id . PHP_EOL;
+				$response['alert'] = TRUE;
+				$response['error'] = TRUE;
+				return $response;
 			}
 		}
 
 		$transaction['exchange'] = $t[0]['exchange'];
 
 		/* map array to exchange-specific format */
-		$transaction = map_transaction(array(), $transaction, $config);
+		$values = array();
+		$values['transaction_id'] = $transaction_id;
+		$transaction = map_order($values, $transaction, $config);
 		query('update_transaction', $config, $transaction);
 
-		return $transaction;
+		$response['result'] = $transaction;
+		return $response;
 
 	} else {
 
-		$config['chatText'] = 'Invalid pair_asset for transaction_id ' . $transaction_id;
-		telegram($config);
-		return FALSE;
+		$response['msg'] .= 'Invalid pair for transaction_id ' . $transaction_id;
+		$response['alert'] = TRUE;
+		$response['error'] = TRUE;
+		return $response;
 
 	}
+
+	return $response;
 
 }
 
 /* update all transactions in database by querying exchanges */
 
-function update_transactions($config) {
+function update_transactions($config, $exchanges = '', $pair = '') {
 
-	// select all possible combinations of exchange and pair_asset
+	$response = $config['response'];
+
+	if (empty($exchanges)) $exchanges = implode("','", $config['exchanges_trade']);
+
+	// select all possible combinations of exchange and pair
+	$pairs = array();
 	$query = "
 		SELECT DISTINCT
 		exchange,
-		pair_asset
-		FROM transactions
+		pair
+		FROM asset_pairs
 	";
 	$sub_query = "
-		WHERE exchange_transaction_status != 'cancelled'
+		WHERE exchange IN ('{$exchanges}')
+		AND trade = 1
+	";
+	if (!empty($pair)) $sub_query .= " AND pair = '{$pair}'";
+	$sub_query .= " ORDER BY pair, exchange";
+	$result = query($query . $sub_query, $config);
+	if (!empty($result))
+		foreach ($result as $pair) array_push($pairs, $pair);
+	$query = "
+		SELECT DISTINCT
+		exchange,
+		pair
+		FROM transactions
+	";
+	$sub_query .= "
 		AND from_asset != to_asset
 	";
-	if (!empty($config['exchange'])) {
-		$sub_query .= " AND exchange = '" . $config['exchange'] . "'";
-	} else {
-		$sub_query .= " AND exchange IN (" . $config['exchanges_trade'] . ")";
+	$result = query($query . $sub_query, $config);
+	if (!empty($result))
+		foreach ($result as $pair) array_push($pairs, $pair);
+	// deduplicate exchange pairs
+	$pairs = dedupe_array($pairs);
+	if ($config['debug']) $response['msg'] .= var_export($pairs, TRUE);
+	if (empty($pairs)) {
+		$response['msg'] .= 'database query returned no pairs to update' . PHP_EOL;
+		return $response;
 	}
-	if (!empty($config['pair'])) $sub_query .= " AND pair_asset = '" . $config['pair'] . "'";
-	$pairs = query($query . $sub_query, $config);
-	if ($config['debug']) var_dump($pairs);
-	if (empty($pairs)) return FALSE;
 
 	// for each combination, query the exchange and put result in $transactions
 	$transactions = array();
 	foreach ($pairs as $pair) {
 		$config['exchange'] = $pair['exchange'];
 		$config = config_exchange($config);
-		$config['pair'] = $pair['pair_asset'];
-		$result = history_orders($config);
-		if (!empty($result)) {
-			// countdim checks the array depth
-			if (countdim($result) == 1) {
-				$result['exchange'] = $config['exchange'];
-				array_push($transactions, $result);
-			} elseif (countdim($result) > 1) {
-				foreach ($result as $res) {
-					$res['exchange'] = $config['exchange'];
-					array_push($transactions, $res);
+		$config['pair'] = $pair['pair'];
+		// for each statuses_orders permutate query
+		$conditions = array();
+		switch ($pair['exchange']) {
+			case 'ascendex':
+				array_push($conditions, '');
+			break;
+			case 'okex_spot':
+			case 'okex_margin':
+				foreach ($config['statuses_orders'] as $key => $val)
+					if ($val)
+						array_push($conditions, '&state=' . $config['status_exchange'][$key]);
+			break;
+		}
+		foreach ($conditions as $condition) {
+			$result = history_orders($config, $condition);
+			if (!empty($result)) {
+				// countdim checks the array depth
+				if (countdim($result) == 1) {
+					$result['exchange'] = $pair['exchange'];
+					$result['purpose'] = 'trade';
+					array_push($transactions, $result);
+				} elseif (countdim($result) > 1) {
+					foreach ($result as $res) {
+						$res['exchange'] = $pair['exchange'];
+						$res['purpose'] = 'trade';
+						array_push($transactions, $res);
+					}
 				}
 			}
+			// pause to limit number of requests to exchange per second
+			sleep(0.2);
 		}
-		// pause to limit number of requests to exchange per second
-		sleep(0.2);
 	}
 
-	if (empty($transactions)) return FALSE;
+	// after orders have been queried, check loans
+	foreach ($config['exchanges_margin'] as $exchange) {
 
-	$query = "SELECT * FROM transactions"; # whole records
+		// check for open (0) and closed (1) loans
+		foreach (array(0,1) as $status) {
+
+			$config['exchange'] = $exchange;
+			$config['account'] = 'margin';
+			$config = config_exchange($config);
+
+			switch ($config['exchange']) {
+				case 'okex_spot':
+				case 'okex_margin':
+					$config['api_request'] =
+						$config['loan_history'] .
+						'?status=' . $status
+					;
+					$config['url'] .= $config['api_request'];
+				break;
+			}
+
+			// query exchange
+			$result = query_api($config);
+
+			// convert result to transaction format
+			foreach ($result as $loan) {
+
+				$loan['exchange'] = $config['exchange'];
+				$loan['purpose'] = 'loan';
+				if ($status === 1) {
+					$loan['exchange_transaction_status'] = 'complete';;
+				} else if ($status === 0) {
+					$loan['exchange_transaction_status'] = 'open';
+				}
+
+				array_push($transactions, $loan);
+
+			}
+		}
+	}
+
+	if (empty($transactions)) {
+		$response['msg'] .= 'exchange(s) returned no transactions to update' . PHP_EOL;
+		return $response;
+	}
+
+	$transactions = dedupe_array($transactions);
+
+	$query = "SELECT transaction_id, exchange, exchange_transaction_id, recorded, purpose FROM transactions";
+	$sub_query = "
+		WHERE exchange IN ('{$exchanges}')
+		AND purpose IN ('trade','loan')
+	";
 	$existing = query($query . $sub_query, $config);
 
 	foreach ($transactions as $t) {
-		if ($t['exchange'] == 'bitmax') {
-			if (!empty($t['data'])) {
-				process_transaction($config, $existing, $t['data']);
-			}
-		}
-		if ($t['exchange'] == 'okex') {
-			if (!empty($t)) {
-				process_transaction($config, $existing, $t);
-			}
+		if ($t['exchange'] == 'ascendex') $t = $t['data'];
+		if (!empty($t)) {
+			$response_x = process_transaction($config, $existing, $t);
+			$response['msg'] .= $response_x['msg'];
+			$id = $response_x['result']['id'];
+			$response['result'][$t['exchange']][$id] = $response_x['result']['action'];
 		}
 	}
+
+	return $response;
 
 }
 
 /* transform transaction data from exchange and save in database */
 
-function process_transaction($config, $existing, $order) {
+function process_transaction($config, $existing, $transaction) {
 
-	// map order id only, not other order details
-	// note that $order_id_only = TRUE
-	$order = map_transaction(array(), $order, $config, TRUE);
+	$response = $config['response'];
+
+	// map transaction id only, not other details
+	// in update_transactions we query the exchange
+	// without specifying exchange_transaction_id to return any unrecorded transactions
+	$transaction = map_transaction_id($transaction);
 
 	// if transaction exists in database, use existing record
 	$exists = FALSE;
 	if (!empty($existing))
 		foreach ($existing as $exist) {
 			if (
-				$exist['exchange_transaction_id'] == $order['exchange_transaction_id']
-				&& $exist['exchange'] == $order['exchange']
+				$exist['exchange_transaction_id'] == $transaction['exchange_transaction_id']
+				&& $exist['exchange'] == $transaction['exchange']
+				&& $exist['purpose'] == $transaction['purpose']
 			) {
 				$exists = TRUE;
-				$values = $exist;
-				echo 'existing transaction' . PHP_EOL;
+				$response['msg'] .= "found existing {$transaction['purpose']} exchange_transaction_id {$transaction['exchange_transaction_id']}, ";
+				if ($exist['recorded']) {
+					$response['msg'] .= 'closed and already recorded' . PHP_EOL;
+					$response['result']['id'] = $transaction['exchange_transaction_id'];
+					$response['result']['action'] = 'ignored';
+					return $response;
+				}
+				$query = "SELECT * FROM transactions WHERE transaction_id = {$exist['transaction_id']}";
+				$values = query($query, $config);
+				$values = $values[0];
+				break 1;
 			}
 		}
 
 	// if transaction not exists in database, create new entry with default values
 	if (!$exists) {
-		$values = $config['transaction'];
-		$values['purpose'] = 'trade';
-		$values['exchange'] = $config['exchange'];
-		echo 'new transaction' . PHP_EOL;
+		$values = array();
+		$values['purpose'] = $transaction['purpose'];
+		$values['exchange'] = $transaction['exchange'];
+		$response['msg'] .= "new {$transaction['purpose']} transaction for exchange_transaction_id {$transaction['exchange_transaction_id']}, ";
 	}
 
 	/* map exchange data array */
-	$values = map_transaction($values, $order, $config, FALSE);
+	if ($values['purpose'] == 'trade')
+		$values = map_order($values, $transaction, $config);
+	if ($values['purpose'] == 'loan')
+		$values = map_loan($values, $transaction, $config);
 
-	query('update_transaction', $config, $values);
+	if ($exists) {
+		$result = query('update_transaction', $config, $values);
+		if (!is_numeric($result))
+			$action = 'error';
+		else if ($result)
+			$action = 'updated';
+		else
+			$action = 'no update';
+	} else {
+		$result = query('insert_transaction', $config, $values);
+		if ($result !== 1)
+			$action = 'error';
+		else
+			$action = 'inserted';
+	}
+
+	if ($action === 'error') {
+		$response['msg'] .= "error: unable to update database correctly " . PHP_EOL . var_export($values, TRUE);
+		$response['alert'] = TRUE;
+		process($response, $config);
+	} else {
+		$response['msg'] .= $action . PHP_EOL;
+	}
+
+	$response['result']['id'] = $transaction['exchange_transaction_id'];
+	$response['result']['action'] = $action;
+
+	return $response;
+
+}
+
+/* map exchange transaction id to database format */
+
+function map_transaction_id($transaction) {
+
+	switch ($transaction['exchange']) {
+		case 'ascendex':
+			$transaction['exchange_transaction_id'] = $transaction['orderId'];
+		break;
+		case 'okex_spot':
+		case 'okex_margin':
+			if ($transaction['purpose'] == 'trade')
+				$transaction['exchange_transaction_id'] = $transaction['order_id'];
+			if ($transaction['purpose'] == 'loan')
+				$transaction['exchange_transaction_id'] = $transaction['borrow_id'];
+		break;
+	}
+
+	return $transaction;
 
 }
 
 /* map exchange order data array format to database format */
 
-function map_transaction($values, $order, $config, $order_id_only = FALSE) {
+function map_order($values, $order, $config) {
 
-	switch ($order['exchange']) {
-		case 'bitmax':
-			$order['exchange_transaction_id'] = $order['orderId'];
-		break;
-		case 'okex':
-			$order['exchange_transaction_id'] = $order['order_id'];
-		break;
-	}
-
-  if ($order_id_only) return $order;
+	$order = map_transaction_id($order);
 
 	$time = NULL;
-	$status = NULL;
 	$pair_price = NULL;
 	$symbol = NULL;
 	$filled = NULL;
@@ -233,59 +386,74 @@ function map_transaction($values, $order, $config, $order_id_only = FALSE) {
 
 	switch ($order['exchange']) {
 
-		case 'bitmax':
+		case 'ascendex':
 			$time = $order['lastExecTime'];
 			switch($order['status']) {
+				/* order filled */
 				case 'Filled':
-					$status = 'filled';
+					$values['exchange_transaction_status'] = 'complete';
 					$values['time_closed'] = $time;
 				break;
+				/* order open */
 				case 'New':
 				case 'PartiallyFilled':
-					$status = 'open';
+					$values['exchange_transaction_status'] = 'open';
 					$values['time_opened'] = $time;
 				break;
+				/* order open, but pending trigger */
 				case 'PendingNew':
-					$status = 'pending_trigger';
+					$values['exchange_transaction_status'] = 'trigger open';
 					$values['time_opened'] = $time;
 				break;
+				/* order cancelled */
 				case 'Canceled': # (server typo spelled Canceled)
 				case 'Reject':
-					$status = 'cancelled';
+					$values['exchange_transaction_status'] = 'cancelled';
 					$values['time_closed'] = $time;
 				break;
+				default:
+					$values['exchange_transaction_status'] = 'unconfirmed';
 			}
 			$pair_price = $order['price'];
+			$avg_price = $order['avgPx'];
 			$symbol = $order['symbol'];
 			$filled = $order['cumFilledQty'];
-			$quantity = $order['orderQty'];
-			$avg_price = $order['avgPx'];
+			$quantity = $order['qty'];
 			$fee = $order['cumFee'];
 			$fee_asset = $order['feeAsset'];
 			$direction = $order['side'];
 		break;
 
-		case 'okex':
+		case 'okex_spot':
+		case 'okex_margin':
 			switch($order['state']) {
+				/* order filled */
 				case '2': # Fully Filled
-					$status = 'filled';
+				case '7': # Complete
+					$values['exchange_transaction_status'] = 'complete';
 				break;
+				/* order open */
 				case '0': # Open
 				case '1': # Partially Filled
-					$status = 'open';
+				case '6': # open and/or partially filled
+					$values['exchange_transaction_status'] = 'open';
 				break;
+				/* order unconfirmed */
 				case '3': # Submitting
 				case '4': # Canceling
-					$status = 'unconfirmed';
+					$values['exchange_transaction_status'] = 'unconfirmed';
 				break;
+				/* order cancelled */
 				case '-1': # Canceled
 				case '-2': # Failed
-					$status = 'cancelled';
+					$values['exchange_transaction_status'] = 'cancelled';
 				break;
+				default:
+					$values['exchange_transaction_status'] = 'unconfirmed';
 			}
-			$values['time_opened'] = strtotime($order['created_at']);
-			#$values['time_closed'] = strtotime($order['timestamp']);
-			$pair_price = $order['price_avg'];
+			$values['time_opened'] = strtotime($order['created_at']) * 1000;
+			/* time_closed is not provided in order details */
+			# if (isset($order['time_closed'])) $values['time_closed'] = $order['time_closed'];
 			$symbol = str_replace('-', '/', $order['instrument_id']);
 			if ($order['type'] == 'limit') {
 				$quantity = $order['size'];
@@ -298,6 +466,7 @@ function map_transaction($values, $order, $config, $order_id_only = FALSE) {
 				}
 				$filled = $order['filled_notional'];
 			}
+			$pair_price = $order['price'];
 			$avg_price = $order['price_avg'];
 			$fee = abs($order['fee']);
 			$fee_asset = $order['fee_currency'];
@@ -306,37 +475,16 @@ function map_transaction($values, $order, $config, $order_id_only = FALSE) {
 
 	}
 
-	/* order filled */
-	if ($status == 'filled') {
-		$values['exchange_transaction_status'] = 'complete';
-	}
-
-	/* order open */
-	if ($status == 'open') {
-		$values['exchange_transaction_status'] = 'open';
-		$values['pair_price'] = $pair_price;
-	}
-
-	/* order open, but pending trigger */
-	if ($status == 'pending_trigger') {
-		$values['exchange_transaction_status'] = 'trigger open';
-		$values['pair_price'] = $pair_price;
-	}
-
-	/* order cancelled */
-	if ($status == 'cancelled') {
-		$values['exchange_transaction_status'] = 'cancelled';
-	}
-
 	/* simple order information */
 	$values['exchange_transaction_id'] = $order['exchange_transaction_id'];
-	$values['pair_asset'] = $symbol;
+	$values['pair'] = $symbol;
 
 	/* read asset names */
 	$pair = explode('/', $symbol);
 
 	/* read amounts */
-	$values['percent_complete'] = round(100 * $filled / $quantity, 0);
+	$values['percent_complete'] = 100 * $filled / $quantity;
+	$values['percent_complete'] = number_format($values['percent_complete'], 20, '.', '');
 	if ($filled > 0) {
 		$price = $avg_price;
 	} else {
@@ -356,7 +504,7 @@ function map_transaction($values, $order, $config, $order_id_only = FALSE) {
 		}
 		$values['pair_price'] = $values['to_amount'] / $values['from_amount'];
 		if (in_array($pair[1], array('USDT','USD','USDC','DAI'))) {
-			$values['from_price_usd'] = $values['to_amount'] / $values['from_amount'];
+			$values['from_price_usd'] = $values['to_amount'] / $values['from_amount']; // return different value to $price
 			$values['to_price_usd'] = 1;
 			$values['price_reference'] = $order['exchange'];
 		}
@@ -373,12 +521,54 @@ function map_transaction($values, $order, $config, $order_id_only = FALSE) {
 		} else {
 			$values['to_fee'] = $fee / $price;
 		}
-		$values['pair_price'] = $values['from_amount'] / $values['to_amount'];
+		$values['pair_price'] = $values['from_amount'] / $values['to_amount']; // return different value to $price
 		if (in_array($pair[1], array('USDT','USD','USDC','DAI'))) {
 			$values['from_price_usd'] = 1;
 			$values['to_price_usd'] = $values['from_amount'] / $values['to_amount'];
 			$values['price_reference'] = $order['exchange'];
 		}
+	}
+
+	/* order is complete */
+	if (in_array($values['exchange_transaction_status'], array('complete','cancelled')))
+		$values['recorded'] = 1;
+
+	return $values;
+
+}
+
+/* map exchange loan data array format to database format */
+
+function map_loan($values, $loan, $config) {
+
+	$loan = map_transaction_id($loan);
+
+	$values['exchange_transaction_id'] = $loan['exchange_transaction_id'];
+	$values['exchange_transaction_status'] = $loan['exchange_transaction_status'];
+	if ($values['exchange_transaction_status'] == 'complete')
+		$values['recorded'] = 1;
+	if ($values['exchange_transaction_status'] == 'open')
+		$values['recorded'] = 0;
+
+	switch ($config['exchange']) {
+		case 'okex_spot':
+		case 'okex_margin':
+			$values['to_amount'] = $loan['amount'];
+			$values['to_fee'] = $loan['interest'];
+			$values['exchange_transaction_id'] = $loan['borrow_id'];
+			$values['time_opened'] = strtotime($loan['created_at']) * 1000;
+			$values['from_asset'] = $loan['currency'];
+			$values['to_asset'] = $loan['currency'];
+			if ($values['recorded']) {
+				$values['time_closed'] = strtotime($loan['force_repay_time']) * 1000;
+				$values['percent_complete'] = 100;
+			} else {
+				$values['percent_complete'] = 100 * ($loan['repay_amount'] + $loan['paid_interest']) / ($loan['amount'] + $loan['interest']);
+				$values['percent_complete'] = number_format($values['percent_complete'], 20, '.', '');
+			}
+			$values['pair'] = str_replace('-', '/', $loan['instrument_id']);
+			$values['pair_price'] = $loan['rate']; # interest rate daily
+		break;
 	}
 
 	return $values;
@@ -387,51 +577,57 @@ function map_transaction($values, $order, $config, $order_id_only = FALSE) {
 
 /* calculate $AUD price from $USD price */
 
-function calculate_orders($config) {
+function calculate_aud($config, $all = FALSE) {
+
+	$response = $config['response'];
 
 	$query = "
-		SELECT
-		a.transaction_id,
-		b.close AS price_aud_usd,
-		'https://twelvedata.com/' AS aud_usd_reference
-		FROM transactions a
-		CROSS JOIN price_history b
-		INNER JOIN (
-			SELECT
-			a.transaction_id,
-			MIN(ABS(a.time_closed - b.timestamp)) AS min_abs_value
-			FROM transactions a
-			CROSS JOIN price_history b
-			WHERE a.price_aud_usd = 0
-			AND a.exchange_transaction_status = 'complete'
-			AND b.pair = 'AUD/USD'
-			GROUP BY a.transaction_id
-		) t
-		ON a.transaction_id = t.transaction_id
-		AND ABS(a.time_closed - b.timestamp) = t.min_abs_value
-		WHERE a.price_aud_usd = 0
-		AND a.exchange_transaction_status = 'complete'
-		AND b.pair = 'AUD/USD'
-	";
-	$orders = query($query, $config);
-	foreach ($orders as $order) {
-		$query = "
-			UPDATE transactions
-			SET price_aud_usd = " . $order['price_aud_usd'] . ",
-			aud_usd_reference = '" . $order['aud_usd_reference'] . "'
-			WHERE transaction_id = " . $order['transaction_id']
-		;
-		query($query, $config);
-	}
-
-	# capital estimate
-	$query = "
-		UPDATE transactions SET
-		fee_amount_usd = to_fee * to_price_usd,
-		capital_amount = to_amount * to_price_usd / price_aud_usd,
-		capital_fee = fee_amount_usd / price_aud_usd
+		SELECT transaction_id
+		FROM transactions
 		WHERE exchange_transaction_status = 'complete'
 	";
-	query($query, $config);
+	if (!$all) $query .= "AND price_aud_usd = 0";
+	$transactions = query($query, $config);
+	foreach ($transactions as $t) {
+		$query = "
+			SELECT
+			b.close AS price_aud_usd,
+			b.timestamp AS aud_usd_timestamp,
+			c.reference AS aud_usd_reference,
+			ABS(a.time_closed - b.timestamp) AS min_abs_value
+			FROM transactions a
+			CROSS JOIN price_history b
+			INNER JOIN asset_pairs c
+			ON b.pair_id = c.pair_id
+			WHERE a.transaction_id = '{$t['transaction_id']}'
+			AND c.pair = 'AUD/USD'
+			AND c.currency_end > a.time_closed
+			AND c.history_start < a.time_closed
+			AND b.close > 0
+			AND ABS(a.time_closed - b.timestamp) < ABS(a.time_closed - a.aud_usd_timestamp)
+			ORDER BY min_abs_value
+			LIMIT 1
+		";
+		$history = query($query, $config);
+		if (!empty($history)) {
+			$history = $history[0];
+			$query = "
+				UPDATE transactions
+				SET
+				price_aud_usd = {$history['price_aud_usd']},
+				aud_usd_reference = '{$history['aud_usd_reference']}',
+				aud_usd_timestamp = {$history['aud_usd_timestamp']},
+				fee_amount_usd = to_fee * to_price_usd,
+				capital_amount = to_amount * to_price_usd / {$history['price_aud_usd']},
+				capital_fee = fee_amount_usd / {$history['price_aud_usd']}
+				WHERE transaction_id = {$t['transaction_id']}
+			";
+			$result = query($query, $config);
+			$response['count'] += $result;
+		}
+	}
+	$response['msg'] .= "Updated AUD price for {$response['count']} completed transactions" . PHP_EOL;
+
+	return $response;
 
 }

@@ -17,7 +17,7 @@
 `condition_tactic` indicates other tactic to wait for
 `condition_pair_test` is set to 0 if waiting for a price indicator to pass a threshold, otherwise 1
 `condition_pair_id`, `condition_pair_currency_min`, `condition_pair_indicator`, `condition_pair_value_operand`, `condition_pair_value`, these define the price indicator
-`action`, `exchange`, `pair_asset`, `from_asset`, `from_amount`, `from_percent`, `to_asset`, `trade_price`, `to_fee_max`, these define the order, though note order is optional, some tactics will not have any order and only serve as dependency for another tactic
+`action`, `exchange`, `pair`, `from_asset`, `from_amount`, `from_percent`, `to_asset`, `trade_price`, `to_fee_max`, these define the order, though note order is optional, some tactics will not have any order and only serve as dependency for another tactic
 `transaction_id` captures the transaction_id (order id) once it is placed
 */
 
@@ -44,7 +44,7 @@ CREATE TABLE `tactics` (
   `condition_pair_value` decimal(40,20) DEFAULT NULL,
   `action` enum('delete','limit','market','none') NOT NULL DEFAULT 'none',
   `exchange` char(32) DEFAULT NULL,
-  `pair_asset` varchar(64) DEFAULT NULL,
+  `pair` varchar(64) DEFAULT NULL,
   `from_asset` char(16) DEFAULT NULL,
   `from_amount` decimal(30,20) DEFAULT NULL,
   `from_percent` int(11) DEFAULT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE `assets` (
   `asset` varchar(32) NOT NULL,
   `amount` decimal(40,20) NOT NULL,
   `price_aud` decimal(30,20) NOT NULL,
-  `source` varchar(32) NOT NULL,
+  `exchange` varchar(32) NOT NULL,
   `class` enum('crypto','fiat','stock') NOT NULL,
   `investment_id` varchar(128) NOT NULL,
   `investment_proportion` decimal(6,4) NOT NULL,
@@ -91,7 +91,7 @@ CREATE TABLE `asset_pairs` (
   `currency` bigint(20) NOT NULL,
   `history_start` bigint(20) NOT NULL,
   `history_end` bigint(20) NOT NULL,
-  `source` varchar(64) NOT NULL,
+  `exchange` varchar(64) NOT NULL,
   `reference` varchar(1056) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
@@ -120,7 +120,7 @@ CREATE TABLE `indicators` (
 CREATE TABLE `price_history` (
   `history_id` int(11) NOT NULL,
   `pair` char(32) DEFAULT NULL,
-  `source` varchar(32) NOT NULL,
+  `exchange` varchar(32) NOT NULL,
   `timestamp` bigint(20) NOT NULL,
   `period` set('1m','5m','15m','30m','1h','2h','4h','6h','12h','1d','1w') DEFAULT NULL,
   `open` decimal(30,20) DEFAULT NULL,
@@ -201,7 +201,7 @@ CREATE TABLE `transactions` (
   `exchange` char(64) DEFAULT NULL,
   `exchange_transaction_id` char(64) NOT NULL,
   `exchange_transaction_status` enum('trigger open','open','complete','cancelled','unconfirmed') NOT NULL DEFAULT 'unconfirmed',
-  `pair_asset` char(64) NOT NULL,
+  `pair` char(64) NOT NULL,
   `from_asset` char(64) DEFAULT NULL,
   `from_amount` decimal(40,20) DEFAULT NULL,
   `to_asset` char(64) DEFAULT NULL,

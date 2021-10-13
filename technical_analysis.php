@@ -4,12 +4,11 @@ include('includes.php');
 
 # https://www.php.net/manual/en/ref.trader.php
 
-echo '<pre>';
-
 if (isset($_GET['pair_id'])) $pair_id = $_GET['pair_id'];
 else $pair_id = FALSE;
 
-technical_analysis($config, $pair_id);
+$response = technical_analysis($config, $pair_id);
+process($response, $config);
 
 include('system_metrics.php');
 
@@ -20,7 +19,7 @@ include('system_metrics.php');
 
 $values['filterquery'] = "
 	WHERE pair = '" . $pair . "'
-	AND source = '" . $source . "'
+	AND exchange = '" . $exchange . "'
 	AND period = '" . $period_txt . "'
 	AND timestamp >= " . $start . "
 	AND timestamp <= " . $stop
@@ -28,7 +27,7 @@ $values['filterquery'] = "
 $history = query('select_history', $config, $values);
 
 echo 'pair: ' . $pair . '<br>';
-echo 'source: ' . $source . '<br>';
+echo 'exchange: ' . $exchange . '<br>';
 echo 'period: ' . $period . '<br><br>';
 echo 'observations: ' . count($history). '<br>';
 
@@ -51,8 +50,9 @@ foreach ($history as $hist) {
 }
 if ($missing_data) {
 	echo 'missing data at array position ' . $missing_array . ', <br>time ' . date('Y-m-d H:i T', $missing_obs / 1000) . ', <br>timestamp ' . $missing_obs . ', <br>period ' . $diff . '<br>';
-	var_dump($history[$missing_array - 1]);
-	var_dump($history[$missing_array]);
+
+	var_export($history[$missing_array - 1]);
+	var_export($history[$missing_array]);
 }
 $data_open = array_column($history, 'open');
 $data_high = array_column($history, 'high');
@@ -111,7 +111,7 @@ for ($i = $last - $points; $i < $last; $i++) {
 		(int)$history[$i]['volume']
 	));
 }
-#var_dump($history_recent);
+#var_export($history_recent);
 echo '<br>from ' . date('Y-m-d H:i T', $history_recent[$points - 1][0] / 1000);
 echo ' to ' . date('Y-m-d H:i T', $history_recent[0][0] / 1000) . '<br>';
 echo $points . ' observations';

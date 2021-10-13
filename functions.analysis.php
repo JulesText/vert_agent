@@ -1,14 +1,26 @@
-<?
+<?php
 
 /* calculate and save price indicators */
 
-function technical_analysis($config, $pair_id = FALSE) {
+function technical_analysis($config, $pair_ids = FALSE, $backdate = FALSE) {
+
+	$response = $config['response'];
 
 	# values in the returned arrays from trader will be rounded to this precision
 	ini_set('trader.real_precision', '18');
 
-	$query = "SELECT DISTINCT pair, period, source, currency, history_start FROM asset_pairs WHERE analyse";
-	if ($pair_id) $query .= " AND pair_id = " . $pair_id;
+	$query = "
+		SELECT
+		pair_id,
+		pair,
+		period,
+		exchange,
+		currency_end,
+		history_start
+		FROM asset_pairs
+		WHERE analyse
+	";
+	if ($pair_ids) $query .= " AND pair_id IN (" . $pair_ids . ")";
 	$pairs = query($query, $config);
 
 	$stop = $config['timestamp'];
@@ -28,21 +40,23 @@ function technical_analysis($config, $pair_id = FALSE) {
 
 	foreach ($pairs as $pair) {
 
-		$period_txt = $config['period'][$pair['period']];
 		$period = $pair['period'] * 60000;
-		$start = $stop - $period * ($points + $points_buffer);
+		if ($backdate)
+			$start = $backdate - $period * ($points + $points_buffer);
+		else
+			$start = $stop - $period * ($points + $points_buffer);
 
 		$query = "
-			SELECT history_id, timestamp, close FROM price_history
-			WHERE pair = '" . $pair['pair'] . "'
-			AND source = '" . $pair['source'] . "'
-			AND period = '" . $period_txt . "'
+			SELECT
+			history_id, timestamp, close
+			FROM price_history
+			WHERE pair_id = '" . $pair['pair_id'] . "'
 			AND timestamp >= " . $start . "
 			AND timestamp <= " . $stop . "
-			ORDER BY timestamp ASC
+			ORDER BY timestamp
 		";
 		$hist = query($query, $config);
-		if ($config['debug']) echo $query . PHP_EOL;
+		if ($config['debug']) $response['msg'] .= $query . PHP_EOL;
 		if (empty($hist)) continue 1;
 
 		$last = $hist[0]['timestamp'] - $period;
@@ -59,14 +73,14 @@ function technical_analysis($config, $pair_id = FALSE) {
 			$i++;
 		}
 		if ($missing_data) {
-			echo '
-				missing data at array position ' . $missing_array . ', <br>
-				time ' . date('Y-m-d H:i T', $missing_obs / 1000) . ', <br>
-				timestamp ' . $missing_obs . ', <br>
-				period ' . $period . '<br>
-			';
-			var_dump($hist[$missing_array - 1]);
-			var_dump($hist[$missing_array]);
+			$response['msg'] .=
+				'missing data at array position ' . $missing_array . PHP_EOL .
+				'time ' . date('Y-m-d H:i T', $missing_obs / 1000) . PHP_EOL .
+				'timestamp ' . $missing_obs . PHP_EOL .
+				'period ' . $period . PHP_EOL .
+				var_export($hist[$missing_array - 1], TRUE) . PHP_EOL .
+				var_export($hist[$missing_array], TRUE) . PHP_EOL
+			;
 			continue 1;
 		}
 
@@ -119,7 +133,6 @@ function technical_analysis($config, $pair_id = FALSE) {
 
 		foreach ($roc as $n) {
 			$r = trader_roc($dc, $n);
-			var_dump($r);
 			for ($i = 0; $i < $count; $i++) {
 				if (isset($r[$i]))
 					$hist[$i]['roc'.$n] = $r[$i];
@@ -128,7 +141,9 @@ function technical_analysis($config, $pair_id = FALSE) {
 
 		foreach ($corr as $key => $array) {
 			$query = "
-				SELECT DISTINCT pair_id, pair, source, currency, history_start FROM
+				SELECT DISTINCT
+				pair_id, pair, exchange, currency_end, history_start
+				FROM asset_pairs
 				WHERE analyse
 				AND period = " . $pair['period'] . "
 				AND pair LIKE '%" . $key . "/USD%'
@@ -136,13 +151,13 @@ function technical_analysis($config, $pair_id = FALSE) {
 			$res = query($query, $config);
 			if (!empty($res)) {
 				$query = "
-					SELECT timestamp, close FROM price_history
-					WHERE pair = '" . $res[0]['pair'] . "'
-					AND source = '" . $res[0]['source'] . "'
-					AND period = '" . $period_txt . "'
+					SELECT
+					timestamp, close
+					FROM price_history
+					WHERE pair_id = '" . $res[0]['pair_id'] . "'
 					AND timestamp >= " . $hist[0]['timestamp'] . "
 					AND timestamp <= " . $hist[$count-1]['timestamp'] . "
-					ORDER BY timestamp ASC
+					ORDER BY timestamp
 				";
 				$res = query($query, $config);
 				if (!empty($res) && count($res) == $count) {
@@ -159,19 +174,32 @@ function technical_analysis($config, $pair_id = FALSE) {
 		}
 
 		$omit = array('history_id', 'timestamp', 'open', 'high', 'low', 'close', 'volume');
+		$updated = 0;
+		$indicators = 0;
 		foreach ($hist as $h) {
+			$i = 0;
 			$sep = '';
 			$query = "UPDATE price_history SET ";
 			foreach ($h as $key => $val) {
 				if (!in_array($key, $omit, TRUE)) {
 					$query .= $sep . $key . " = '" . $val . "'";
 					$sep = ',';
+					$i++;
 				}
 			}
 			$query .= " WHERE history_id = " . $h['history_id'];
-			query($query, $config);
+			if ($i) {
+				$j = query($query, $config);
+				$updated += $j;
+				if ($j && $i > $indicators) $indicators = $i;
+			}
 		}
 
+		$response['msg'] .= "analysis: updated up to {$indicators} indicators across {$updated} records for pair_id {$pair['pair_id']}, not counting existing values" . PHP_EOL;
+		$response['count'] += $indicators * $updated;
+
 	}
+
+	return $response;
 
 }

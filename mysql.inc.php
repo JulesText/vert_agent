@@ -22,6 +22,7 @@ function getsql($config, $values, $querylabel) {
 		case 'select_history':
 			$sql = "SELECT
 				`history_id`,
+				`pair_id`,
 				`timestamp`,
 				`open`,
 				`close`,
@@ -32,35 +33,59 @@ function getsql($config, $values, $querylabel) {
 			";
 		break;
 
-		case 'update_history':
-			$sql = "
-				INSERT INTO `price_history`
-				(
-				`pair`,
-				`source`,
-				`timestamp`,
-				`period`,
-				`open`,
-				`close`,
-				`high`,
-				`low`,
-				`volume`,
-				`imputed`
-				)
-				VALUES
-				(
-				'{$values['pair']}',
-				'{$values['source']}',
-				'{$values['timestamp']}',
-				'{$values['period']}',
-				'{$values['open']}',
-				'{$values['close']}',
-				'{$values['high']}',
-				'{$values['low']}',
-				'{$values['volume']}',
-				'{$values['imputed']}'
-				)
-			";
+		case 'update_content':
+		case 'insert_transaction':
+		case 'insert_asset_pair':
+		case 'insert_price_history':
+		case 'insert_tactic':
+		case 'insert_tactic_external':
+			if ($querylabel == "insert_price_history")
+				$sql = "INSERT INTO price_history" . PHP_EOL;
+			else if ($querylabel == "update_content")
+				$sql = "REPLACE INTO web_content" . PHP_EOL;
+			else if ($querylabel == "insert_transaction")
+				$sql = "INSERT INTO transactions" . PHP_EOL;
+			else if ($querylabel == "insert_asset_pair")
+				$sql = "INSERT INTO asset_pairs" . PHP_EOL;
+			else if ($querylabel == "insert_tactic")
+				$sql = "INSERT INTO tactics" . PHP_EOL;
+			else if ($querylabel == "insert_tactic_external")
+				$sql = "INSERT INTO tactics_external" . PHP_EOL;
+			$sql .= "SET" . PHP_EOL;
+			$sep = "";
+			foreach ($values as $key => $val) {
+				if ($key == 'filterquery') continue 1;
+				if ($val == '') $val = 'NULL';
+				else $val = "'{$val}'";
+				$sql .= $sep . $key . " = {$val}" . PHP_EOL;
+				$sep = ", ";
+			}
+		break;
+
+		case 'update_transaction':
+			$sql = "UPDATE transactions SET" . PHP_EOL;
+			$sep = "";
+			foreach ($values as $key => $val) {
+				if ($key == 'transaction_id' || $key == 'filterquery') continue 1;
+				if ($val == '') $val = 'NULL';
+				else $val = "'{$val}'";
+				$sql .= $sep . $key . " = {$val}" . PHP_EOL;
+				$sep = ", ";
+			}
+			$sql .= "WHERE transaction_id = {$values['transaction_id']}";
+		break;
+
+		case 'update_tactic':
+			$tactic_id = $values['tactic_id'];
+			unset($values['tactic_id']);
+			$sql = "UPDATE tactics SET ";
+			$sep = "";
+			foreach ($values as $key => $val) {
+				if ($key == 'filterquery') continue 1;
+				$sql .= $sep . "{$key} = '{$val}' " . PHP_EOL;
+				$sep = ", ";
+			}
+			$sql .= "WHERE tactic_id = {$tactic_id}";
 		break;
 
 		# keep the most recent record
@@ -69,10 +94,8 @@ function getsql($config, $values, $querylabel) {
 			$sql = "
 				DELETE a FROM `price_history` a
 				INNER JOIN `price_history` b
-				ON a.pair = b.pair
+				ON a.pair_id = b.pair_id
 				AND a.timestamp = b.timestamp
-				AND a.period = b.period
-				AND a.source = b.source
 				WHERE
 				a.history_id < b.history_id
 				{$values['filterquery']}
@@ -80,108 +103,26 @@ function getsql($config, $values, $querylabel) {
 			";
 		break;
 
-		case 'update_content':
-			$sql = "
-				REPLACE INTO `web_content`
-				(
-				`content_id`,
-				`content`,
-				`timestamp`,
-				`notified`
-				)
-				VALUES
-				(
-				'{$values['content_id']}',
-				'{$values['content']}',
-				'{$values['timestamp']}',
-				'{$values['notified']}'
-				)
-			";
-		break;
-
-		case 'get_content':
+		case 'select_content':
 			$sql = "SELECT * FROM `web_content` {$values['filterquery']}";
 		break;
 
-		case 'get_tactics':
-			$sql = "SELECT * FROM `tactics` {$values['filterquery']}";
-		break;
-
-		case 'update_tactic':
-			$sql = "UPDATE `tactics` SET `{$values['field']}` = '{$values['value']}' WHERE `tactic_id` = '{$values['tactic_id']}'";
-		break;
-
-		case 'get_transactions':
-			$sql = "SELECT * FROM `transactions` {$values['filterquery']}";
-		break;
-
-		case 'update_transaction':
+		case 'select_tactics':
 			$sql = "
-				REPLACE INTO `transactions`
-				(
-				`transaction_id`,
-				`investment_id`,
-				`investment_proportion`,
-				`time_opened`,
-				`time_closed`,
-				`capital_amount`,
-				`capital_fee`,
-				`purpose`,
-				`exchange`,
-				`exchange_transaction_id`,
-				`exchange_transaction_status`,
-				`percent_complete`,
-				`pair_asset`,
-				`from_asset`,
-				`from_amount`,
-				`to_asset`,
-				`to_amount`,
-				`to_fee`,
-				`pair_price`,
-				`from_price_usd`,
-				`to_price_usd`,
-				`price_reference`,
-				`fee_amount_usd`,
-				`price_aud_usd`,
-				`aud_usd_reference`,
-				`from_wallet`,
-				`to_wallet`,
-				`tactic_id`,
-				`strategy_result_usd`
-				)
-				VALUES
-				(
-				'{$values['transaction_id']}',
-				'{$values['investment_id']}',
-				'{$values['investment_proportion']}',
-				'{$values['time_opened']}',
-				'{$values['time_closed']}',
-				'{$values['capital_amount']}',
-				'{$values['capital_fee']}',
-				'{$values['purpose']}',
-				'{$values['exchange']}',
-				'{$values['exchange_transaction_id']}',
-				'{$values['exchange_transaction_status']}',
-				'{$values['percent_complete']}',
-				'{$values['pair_asset']}',
-				'{$values['from_asset']}',
-				'{$values['from_amount']}',
-				'{$values['to_asset']}',
-				'{$values['to_amount']}',
-				'{$values['to_fee']}',
-				'{$values['pair_price']}',
-				'{$values['from_price_usd']}',
-				'{$values['to_price_usd']}',
-				'{$values['price_reference']}',
-				'{$values['fee_amount_usd']}',
-				'{$values['price_aud_usd']}',
-				'{$values['aud_usd_reference']}',
-				'{$values['from_wallet']}',
-				'{$values['to_wallet']}',
-				'{$values['tactic_id']}',
-				'{$values['strategy_result_usd']}'
-				)
+				SELECT
+				t.*,
+				a.exchange,
+				a.pair,
+				a.leverage
+				FROM tactics t
+				LEFT JOIN asset_pairs a
+				ON t.pair_id = a.pair_id
+				{$values['filterquery']}
 			";
+		break;
+
+		case 'select_transactions':
+			$sql = "SELECT * FROM `transactions` {$values['filterquery']}";
 		break;
 
 		default: // default to assuming that the label IS the query
@@ -192,33 +133,4 @@ function getsql($config, $values, $querylabel) {
 
 	return $sql;
 
-}
-
-function sqlparts($part,$config,$values) {
-
-	if (is_array($values))
-		foreach ($values as $key=>$value)
-			$values[$key] = safeIntoDB($value, $key, $config);
-
-	switch ($part) {
-
-		case "test":
-			$sqlpart = " ";
-		break;
-
-		default:
-			if ($config['debug_sql']) echo "<p class='error'>Failed to find sql component '$part'</p>'";
-			$sqlpart=$part;
-		break;
-
-	}
-
-	if ($config['debug_sql'])
-		echo
-			"<pre>Sqlparts '$part': Result $sqlpart<br>Sanitised values in sqlparts: " .
-			print_r($values,true) .
-			"</pre>"
-		;
-
-	return $sqlpart;
 }

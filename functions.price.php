@@ -1,8 +1,10 @@
-<?
+<?php
 
 /* query exchange for price history for given time period and save in database */
 
 function price_query($config, $pq) {
+
+	$response = $config['response'];
 
 	# make query string
 	switch ($config['exchange']) {
@@ -17,8 +19,8 @@ function price_query($config, $pq) {
 				'&format=JSON&timezone=UTC'
 			;
 		break;
-		case 'bitmax':
-			$config['api_request'] = 'barhist';
+		case 'ascendex':
+			$config['api_request'] = $config['price_history_hash'];
 			$config['price_history'] =
 				$config['url'] .
 				$config['price_history'] .
@@ -27,7 +29,8 @@ function price_query($config, $pq) {
 				'&interval=' . $config['period_exchange'][$pq['period']]
 			;
 		break;
-		case 'okex':
+		case 'okex_spot':
+		case 'okex_margin':
 			$config['price_history'] .= str_replace('/', '-', $pq['pair']);
 			if ($pq['hist_long']) $config['price_history'] .= '/history';
 			$config['price_history'] = $config['url'] . $config['price_history'];
@@ -46,20 +49,19 @@ function price_query($config, $pq) {
 	}
 	$from = $pq['start'];
 
+	# count records inserted
+	$inserted = 0;
+
 	# split the query into separate API requests if the number of records exceeds the maximum allowed
 	for ($i; $i > 0; $i--) {
 
-		echo
-			'$from: ' . $from .
-			' $to: ' . $to .
-			' units: ' . floor(($to - $from) / $pq['period_ms']) .
-			' of ' . floor(($pq['stop'] - $pq['obs_iter']) / $pq['period_ms']) .
-			PHP_EOL
-		;
-		echo
-			'$i:  ' . $i .
-			' $j:   ' . $j .
-			' $period_ms: ' . $pq['period_ms'] .
+		$response['msg'] .=
+			'query: ' .
+			'pair_id ' . $pq['pair_id'] . ', ' .
+			'from "' . unixtime_datetime($from) . '" ' .
+			'to "' . unixtime_datetime($to) . '"' .
+			PHP_EOL .
+			'expect: up to ' . (floor(($to - $from) / $pq['period_ms']) + 1) . ' records ' .
 			PHP_EOL
 		;
 
@@ -75,7 +77,7 @@ function price_query($config, $pq) {
 				$config['url'] = str_replace(' ', '&nbsp;', $config['url']);
 			break;
 
-			case 'bitmax':
+			case 'ascendex':
 				$config['url'] =
 					$config['price_history'] .
 					'&from=' . $from .
@@ -83,7 +85,8 @@ function price_query($config, $pq) {
 				;
 				break;
 
-			case 'okex':
+			case 'okex_spot':
+			case 'okex_margin':
 				if ($pq['hist_long'])
 					$config['api_request'] =
 						'/candles' .
@@ -106,38 +109,40 @@ function price_query($config, $pq) {
 
 		}
 
-		echo 'url: ' . $config['url'] . PHP_EOL;
+		if ($config['debug']) $response['msg'] .= 'url: ' . $config['url'] . PHP_EOL;
 
-		$result = info($config);
+		$result = query_api($config);
+
+		if (empty($result)) $response['msg'] .= 'result: 0 records' . PHP_EOL;
 
 		# process response
 		if (!empty($result)) {
 
-			$values = array();
-			$values['pair'] = $pq['pair'];
-			$values['source'] = $config['exchange'];
-			$values['period'] = $config['period'][$pq['period']];
-			$values['imputed'] = 0;
-
 			# read the response in the array format for the exchange
 			# okex already in correct format
 			if ($config['exchange'] == 'twelve') {
-				$values['pair'] = $result['meta']['symbol'];
+				#$values['pair'] = $result['meta']['symbol'];
 				$result = $result['values'];
 			}
-			if ($config['exchange'] == 'bitmax') {
+			if ($config['exchange'] == 'ascendex') {
 				$array = array();
 				foreach ($result['data'] as $data) array_push($array, $data['data']);
 				$result = $array;
 			}
 
-			echo 'result: ' . count((array)$result) . PHP_EOL;
-			if ($config['debug']) print_r($result);
+			# get timestamp range
+			$start = 1999999999999;
+			$stop = 0;
 
 			# process result one row (price bar) at a time because it will be
 			# easier to check the database if the record already exists using a single row
+			$i = 0;
 			if (!empty($result))
 			foreach ($result as $price) {
+
+				$values = array();
+				$values['pair_id'] = $pq['pair_id'];
+				$values['imputed'] = 0;
 
 				if ($config['exchange'] == 'twelve') {
 					# server seems to expect requested data on separate dates
@@ -149,7 +154,7 @@ function price_query($config, $pq) {
 					$values['volume'] = isset($price['volume']) ? $price['volume'] : 0;
 				}
 
-				if ($config['exchange'] == 'bitmax') {
+				if ($config['exchange'] == 'ascendex') {
 					# possible that server returns missing value for bar
 					$values['timestamp'] = $price['ts']; # bar start time
 					$values['open'] = $price['o'];
@@ -159,8 +164,8 @@ function price_query($config, $pq) {
 					$values['volume'] = $price['v'];
 				}
 
-				if ($config['exchange'] == 'okex') {
-					$values['pair'] = str_replace('-', '/', $values['pair']);
+				if ($config['exchange'] == 'okex_spot' || $config['exchange'] == 'okex_margin') {
+					#$values['pair'] = str_replace('-', '/', $values['pair']);
 					$values['timestamp'] = strtotime($price[0]) * 1000; # convert to unix time
 					$values['open'] = $price[1];
 					$values['high'] = $price[2];
@@ -170,165 +175,154 @@ function price_query($config, $pq) {
 				}
 
 				# save row
-				query('update_history', $config, $values);
-				#var_dump($values);break 2;
+				$inserted += query('insert_price_history', $config, $values);
+				# get timestamp range
+				if ($values['timestamp'] > $stop) $stop = $values['timestamp'];
+				if ($values['timestamp'] < $start) $start = $values['timestamp'];
 				# option to skip deduplication within iteration
 				# would still need to call price_history_dedupe after all iterations
 				# not currently used, but could be for performance improvement
 				if (!$pq['dedupe_hist']) continue 1;
 				# check if duplicate price history record and remove oldest ones
 				$values['filterquery'] = "
-					AND a.pair = '" . $values['pair'] . "'
-					AND a.source = '" . $values['source'] . "'
+					AND a.pair_id = '" . $pq['pair_id'] . "'
 					AND a.timestamp = " . $values['timestamp'] . "
-					AND a.period = '" . $values['period'] . "'
 				";
 				query('deduplicate_history', $config, $values);
 			}
+
+			$response['msg'] .= 'result: ' . $inserted . ' records inserted';
+			if (!empty($result)) $response['msg'] .=
+				', ' .
+				'from "' . unixtime_datetime($start) . '" ' .
+				'to "' . unixtime_datetime($stop) . '"'
+				;
+			$response['msg'] .= PHP_EOL;
+			if ($config['debug']) $response['msg'] .= var_export($result, TRUE);
+			$response['count'] += $inserted;
+
 		}
 
 		$from += $j;
 		$to += $j;
 		sleep(0.2); # use delay to reduce server load
 	}
+
+	return $response;
+
 }
 
 /* check for all possible duplicate price history record and remove oldest ones */
 
 function price_history_dedupe($config) {
 
+	$response = $config['response'];
+
 	# quick check if all records are unique
 	$query_all = "
-		SELECT COUNT(*) AS count FROM `price_history`
+		SELECT COUNT(*) AS count FROM price_history
 	";
 	$total = query($query_all, $config);
 	$query_dis = "
 		SELECT COUNT(
 			DISTINCT
-			`pair`,
-			`source`,
-			`timestamp`,
-			`period`
+			pair_id,
+			timestamp
 		) AS count
-		FROM `price_history`
+		FROM price_history
 	";
 	$dedupes = query($query_dis, $config);
 	$dupes = $total[0]['count'] - $dedupes[0]['count'];
-	echo $dupes . ' duplicates' . PHP_EOL;
-	if (!$dupes) return;
+	$response['msg'] .= $dupes . ' duplicates' . PHP_EOL;
+	if (!$dupes) return $response;
 
-	echo 'deduplicating ...';
+	$response['msg'] .= 'deduplicating ...' . PHP_EOL;
 
 	# list all possible asset pairs and periods
-	$query_pair = "
-		SELECT DISTINCT
-		`pair`,
-		`source`,
-		`period`
-		FROM `price_history`
-	";
+	$query_pair = "SELECT DISTINCT pair_id FROM price_history";
 	$permutations = query($query_pair, $config);
 
 	# process each possible pair
 	$query_ded = "
 		SELECT DISTINCT
-		`pair`,
-		`source`,
-		`timestamp`,
-		`period`
-		FROM `price_history`
+		pair_id,
+		timestamp
+		FROM price_history
 	";
 	foreach ($permutations as $p) {
 
 		$filter = "
-			WHERE pair = '" . $p['pair'] . "'
-			AND source =  '" . $p['source'] . "'
-			AND period =  '" . $p['period'] . "'
+			WHERE pair_id = '" . $p['pair_id'] . "'
 		";
 		$total = query($query_all . $filter, $config);
 		$dedupes = query($query_ded . $filter, $config);
 		$dupes = $total[0]['count'] - count($dedupes);
 
 		if (!$dupes) continue 1;
-		echo $dupes . ' dupes ' . $filter . PHP_EOL;
+		$response['msg'] .= $dupes . ' dupes ' . $filter . PHP_EOL;
+		$response['count'] += $dupes;
 
 		foreach ($dedupes as $record) {
 			$values['filterquery'] = "
-				AND a.pair = '" . $record['pair'] . "'
-				AND a.source = '" . $record['source'] . "'
+				AND a.pair_id = '" . $record['pair_id'] . "'
 				AND a.timestamp = " . $record['timestamp'] . "
-				AND a.period = '" . $record['period'] . "'
 			";
 			query('deduplicate_history', $config, $values);
 		}
 	}
+
+	return $response;
+
 }
 
 /* check for all possible price history records that do not belong to an asset pair and delete */
 
 function price_history_trim($config) {
 
+	$response = $config['response'];
+
 	# get all asset pairs
+	$query = "SELECT pair_id FROM asset_pairs";
+	$pairs = query($query, $config);
+	$sep = '';
+	$filter = '';
+	foreach ($pairs as $pair) {
+		$filter .= $sep . $pair['pair_id'];
+		$sep = ',';
+	}
+
+	# delete price_history without asset pairs
 	$query = "
-		SELECT DISTINCT
-		pair,
-		source,
-		period
-		FROM asset_pairs
-	";
-	$history = query($query, $config);
+		DELETE FROM price_history
+		WHERE pair_id NOT IN (" . $filter . ")
+		OR ISNULL(pair_id)";
+	$result = query($query, $config);
 
-	# get history_id without asset pairs
-	$query = "SELECT history_id FROM price_history WHERE 1=1";
-	foreach ($history as $hist) {
-		if ($config['debug'])
-			foreach ($hist as $key => $val) {
-				echo $key . ': ' . $val . ' ';
-			}
-		echo PHP_EOL;
-		$query .= "
-			AND (
-				pair != '" . $hist['pair'] . "'
-				AND source != '" . $hist['source'] . "'
-				AND period != '" . $hist['period'] . "'
-			)
-		";
-	}
-	$drop_ids = query($query, $config);
+	$response['msg'] = 'deleted: ' . $result . ' history_id without asset pairs from price_history' . PHP_EOL;
 
-	# delete those history_id if any
-	echo PHP_EOL;
-	if (!empty($drop_ids)) {
-		$filter = "
-			FROM price_history
-			WHERE history_id
-			IN (0
-		";
-		foreach ($drop_ids as $array) $filter .= ", " . $array['history_id'];
-		$filter .= ")";
-		$query = "
-			SELECT DISTINCT
-			pair,
-			source,
-			period
-		";
-		$result = query($query . $filter, $config);
-		echo 'deleting history_id without asset pairs: ' . PHP_EOL;
-		var_dump($result);
-		$query = "DELETE ";
-		query($query . $filter, $config);
-	} else {
-		echo 'no history_id without asset pairs';
-	}
+	return $response;
 
 }
 
 /* record the time of the earliest missing price history record */
 
-function history_currency($config, $query, $pq) {
+function history_currency($config, $pq) {
 
+	$response = $config['response'];
+	$query = "
+		SELECT timestamp
+		FROM price_history
+		WHERE pair_id = '{$pq['pair_id']}'
+		ORDER BY timestamp
+	";
 	$history = query($query, $config);
+	if (empty($history)) {
+		$response['msg'] .= 'currency: no records found' . PHP_EOL;
+		return $response;
+	}
+
 	$count = count($history);
+	$currency_start = $history[0]['timestamp'];
 	$currency = $history[$count - 1]['timestamp'];
 
 	$hist = array();
@@ -359,19 +353,33 @@ function history_currency($config, $query, $pq) {
 			}
 		}
 	}
-	echo '$currency: UTC ' . date('Y-m-d H:i:s', $currency / 1000) . PHP_EOL;
+
 	$query = "
 		UPDATE asset_pairs
-		SET currency = " . $currency . "
+		SET
+		currency_start = " . $currency_start . ",
+		currency_end = " . $currency . "
 		WHERE pair_id = " . $pq['pair_id']
 	;
 	query($query, $config);
+
+	$response['msg'] .=
+		'currency: records complete ' .
+		'from "' . date('Y-m-d H:i:s', $currency_start / 1000) . '" ' .
+		'to "' . date('Y-m-d H:i:s', $currency / 1000) . '" ' .
+		'for pair_id ' . $pq['pair_id'] .
+		PHP_EOL
+	;
+
+	return $response;
 
 }
 
 /* check if historical price data is current, and update */
 
 function price_history($config, $pair_id = FALSE) {
+
+	$response = $config['response'];
 
 	# select asset_pairs due for refreshing
 	$query = "
@@ -380,10 +388,10 @@ function price_history($config, $pair_id = FALSE) {
 		AND (
 			(
 				history_end > " . milliseconds() . "
-				AND currency < (" . milliseconds() . " - refresh * 60000)
+				AND currency_end < (" . milliseconds() . " - refresh * 60000)
 			) OR (
 				history_end < " . milliseconds() . "
-				AND currency < (history_end - period * 60000)
+				AND currency_end < (history_end - period * 60000)
 			)
 		)
 	";
@@ -391,25 +399,25 @@ function price_history($config, $pair_id = FALSE) {
 	$pairs = query($query, $config);
 
 	# check if any results
-	if (empty($pairs)) echo 'current';
+	if (empty($pairs)) $response['msg'] .= 'asset pair(s) current';
 	else
 	# process each result
 	foreach ($pairs as $pair) {
 
-		print_r($pair);
+		if ($config['debug']) $response['msg'] .= var_export($pair, TRUE);
 
 		# define exchange parameters
-		$config['exchange'] = $pair['source'];
+		$config['exchange'] = $pair['exchange'];
 		$config = config_exchange($config);
 
 		# array format defined in config.php
 		$pq = $config['price_query'];
+		$pq['pair_id'] = $pair['pair_id'];
 		$pq['pair'] = $pair['pair'];
-		$pq['source'] = $pair['source'];
 		$pq['period'] = $pair['period'];
 		$pq['period_ms'] = $pq['period'] * 60000;
 		$pq['obs_iter'] = $config['obs_iter_max'];
-		$pq['start'] = $pair['currency'];
+		$pq['start'] = $pair['currency_end'];
 		$pq['stop'] = milliseconds();
 
 		# define time parameters
@@ -427,22 +435,24 @@ function price_history($config, $pair_id = FALSE) {
 		# some APIs limit available history for some coins, check if longer history needed
 		switch ($config['exchange']) {
 
-			case 'okex':
+			case 'okex_spot':
+			case 'okex_margin':
 				$obs_request = (milliseconds() - $pq['start']) / $pq['period_ms'];
 				if ($obs_request > $config['obs_hist_max']) {
 					# check if longer history available
 					if (in_array($pair['pair'], $config['hist_pairs'])) {
 						$pq['hist_long'] = TRUE;
 					} else {
-						$config['chatText'] =
+						$response['msg'] .=
 							'requested price history too long for pair_id ' . $pair['pair_id'] .
 							', ' . $obs_request . ' observations requested, only ' .
 							$config['obs_hist_max'] . ' provided by API, ' .
-							'you need to disable collection flag in asset_pairs table'
+							'you need to disable collection flag in asset_pairs table' .
+							PHP_EOL .
+							'(' . milliseconds() . ' - ' . $pq['start'] . ') / ' . $pq['period_ms'] . ' > ' . $config['obs_hist_max'] .
+							PHP_EOL
 						;
-						telegram($config);
-						echo $config['chatText'] . PHP_EOL;
-						echo '(' . milliseconds() . ' - ' . $pq['start'] . ') / ' . $pq['period_ms'] . ' > ' . $config['obs_hist_max'];
+						$response['alert'] = TRUE;
 						continue 2; # continue to next iteration in nearest containing loop (value is +1 when inside 'switch' but not 'if' statement, as of php 7.3)
 					}
 				}
@@ -452,9 +462,7 @@ function price_history($config, $pair_id = FALSE) {
 
 		# select recorded timestamps
 		$query_part = "
-			AND pair = '" . $pair['pair'] . "'
-			AND source = '" . $pair['source'] . "'
-			AND period = '" . $config['period'][$pq['period']] . "'
+			AND pair_id = '" . $pair['pair_id'] . "'
 			AND timestamp >= " . $pq['start'] . "
 			AND timestamp <= " . $pq['stop'] . "
 			ORDER BY timestamp
@@ -463,12 +471,16 @@ function price_history($config, $pair_id = FALSE) {
 			SELECT timestamp
 			FROM price_history
 			WHERE (
-				timestamp = (SELECT MIN(timestamp) FROM price_history WHERE 1=1 " . $query_part . ")
-				OR timestamp = (SELECT MAX(timestamp) FROM price_history WHERE 1=1 " . $query_part . ")
+				timestamp = (SELECT MIN(timestamp) FROM price_history WHERE 1 " . $query_part . ")
+				OR timestamp = (SELECT MAX(timestamp) FROM price_history WHERE 1 " . $query_part . ")
 			)
 		";
 		$history = query($query . $query_part, $config);
-		$count = count($history);
+		if (!empty($history)) {
+			$count = count($history);
+		} else {
+			$count = 0;
+		}
 
 		# define query result parameters
 		if ($count <= 1) {
@@ -482,11 +494,11 @@ function price_history($config, $pair_id = FALSE) {
 
 		# print parameters
 		if ($config['debug']) {
-			echo
+			$response['msg'] .=
 				'history_start: ' . date('Y-m-d H:i:s', $pair['history_start'] / 1000) .
 				' history_end: ' . date('Y-m-d H:i:s', $pair['history_end'] / 1000) . PHP_EOL
 			;
-			echo
+			$response['msg'] .=
 				'$count: ' . $count .
 				' $currency: ' . date('Y-m-d H:i:s', $pq['start'] / 1000) .
 				' $pq[start]: ' . date('Y-m-d H:i:s', $pq['start'] / 1000) .
@@ -494,43 +506,46 @@ function price_history($config, $pair_id = FALSE) {
 			;
 		}
 
+		#var_dump($pq);
+		#echo $oldest . PHP_EOL;
+		#echo $newest . PHP_EOL;
+		#var_dump($history);die;
+
 		# check if the earliest required record is in the database, and if not then query price history
 		if ($oldest > $pq['start'] + $pq['period_ms']) {
 			$pqa = $pq;
 			$pqa['stop'] = $oldest + $pq['period_ms'];
-			price_query($config, $pqa);
+			$response_x = price_query($config, $pqa);
+			$response['msg'] .= $response_x['msg'];
+			$response['count'] += $response_x['count'];
 		}
 
 		# we need to query the existing history again
-		$query = "SELECT timestamp FROM price_history WHERE 1=1";
+		$query = "SELECT timestamp FROM price_history WHERE 1";
 		$history = query($query . $query_part, $config);
 
 		# if there is no existing records, there is a problem
 		if (empty($history)) {
-			$config['chatText'] =
+			$response['msg'] .=
 				'unknown problem with price history update for pair_id ' . $pair['pair_id'] .
 				', unable to query data'
 			;
-			telegram($config);
-			echo $config['chatText'] . PHP_EOL;
+			$response['alert'] = TRUE;
 			continue 1;
 		}
 
 		# impute missing price history records
-		price_missing($config, $history, $pq);
+		$response_x = price_missing($config, $history, $pq);
+		$response['msg'] .= $response_x['msg'];
+		$response['count'] += $response_x['count'];
 
 		# update asset history summary
-		$query_part = "
-			AND pair = '" . $pair['pair'] . "'
-			AND source = '" . $pair['source'] . "'
-			AND period = '" . $config['period'][$pq['period']] . "'
-			AND timestamp >= " . $pair['history_start'] . "
-			AND timestamp <= " . $pair['history_end'] . "
-			ORDER BY timestamp
-		";
-		history_currency($config, $query . $query_part, $pq);
+		$response_x = history_currency($config, $pq);
+		$response['msg'] .= $response_x['msg'];
 
 	}
+
+	return $response;
 
 }
 
@@ -538,68 +553,70 @@ function price_history($config, $pair_id = FALSE) {
 
 function price_recent($config, $pair_id = FALSE) {
 
+	$response = $config['response'];
+
 	$query = "
 		SELECT * FROM asset_pairs
 		WHERE collect
 		AND history_end > " . milliseconds() . "
-		AND currency + refresh * 60000 < " . milliseconds()
+		AND currency_end + refresh * 60000 < " . milliseconds()
 	;
 	if ($pair_id) $query .= " AND pair_id = " . $pair_id;
 	$pairs = query($query, $config);
 
-	if (empty($pairs)) echo 'current';
+	# check if any results
+	if (empty($pairs)) $response['msg'] .= 'asset pair(s) current';
 	else
 	foreach ($pairs as $pair) {
 
-		print_r($pair);
+		if ($config['debug']) $response['msg'] .= var_export($pair, TRUE);
 
 		# define exchange parameters
-		$config['exchange'] = $pair['source'];
+		$config['exchange'] = $pair['exchange'];
 		$config = config_exchange($config);
 
 		# array format defined in config.php
 		$pq = $config['price_query'];
 		$pq['pair_id'] = $pair['pair_id'];
 		$pq['pair'] = $pair['pair'];
-		$pq['source'] = $pair['source'];
+		#$pq['exchange'] = $pair['exchange'];
 		$pq['period'] = $pair['period'];
 		$pq['period_ms'] = $pq['period'] * 60000;
 		$pq['obs_iter'] = $config['obs_iter_max'];
-		$pq['start'] = $pair['currency'];
+		$pq['start'] = $pair['currency_end'];
 
 		# define time parameters
 		$i = floor((milliseconds() - $pq['start']) / $pq['period_ms']);
 		if ($i > $config['obs_curr_max']) $i = $config['obs_curr_max'];
 		$pq['stop'] = intval($pq['start'] + $i * $pq['period_ms']);
 
-		# exit if time period incorrect
+		# exit if time period incorrect or currency equals next interval
 		if ($pq['start'] >= $pq['stop']) continue 1;
 
 		# query price history first
 		# if the history is complete it will not execute
-		price_query($config, $pq);
+		$response_x = price_query($config, $pq);
+		$response['msg'] .= $response_x['msg'];
+		$response['count'] += $response_x['count'];
 
 		# ignore weekends for certain asset classes
 		$pq['weekends'] = weekends($pair['class']);
 
-		$query = "
-			SELECT timestamp FROM price_history
-			WHERE pair = '" . $pq['pair'] . "'
-			AND source = '" . $pq['source'] . "'
-			AND period = '" . $config['period'][$pq['period']] . "'
-			AND timestamp >= " . $pq['start'] . "
-			ORDER BY timestamp
-		";
-
-		history_currency($config, $query, $pq);
+		# update asset history summary
+		$response_x = history_currency($config, $pq);
+		$response['msg'] .= $response_x['msg'];
 
 	}
+
+	return $response;
 
 }
 
 /* impute missing price history records */
 
 function price_missing($config, $history, $pq) {
+
+	$response = $config['response'];
 
 	$count = count($history);
 	$oldest = $history[0]['timestamp'];
@@ -608,9 +625,6 @@ function price_missing($config, $history, $pq) {
 	# create array of timestamps
 	$hist = array();
 	foreach ($history as $array) array_push($hist, $array['timestamp']);
-
-	# print any missing records
-	echo 'missing: ' . PHP_EOL;
 
 	# process each timestamp
 	for ($i = 1; $i < $count; $i++) {
@@ -621,17 +635,32 @@ function price_missing($config, $history, $pq) {
 			$from = $hist[$i - 1] + $pq['period_ms'];
 			# define the last missing record in the sequence, could be the same as the first
 			$to = $hist[$i] - $pq['period_ms'];
-			# query the API for the missing record(s)
+			# print number of missing records
+			$missing = floor(($to - $from) / $pq['period_ms']) + 1;
+			$response['msg'] .=
+				'missing: ' . $missing . ' records, ' .
+				'"' . unixtime_datetime($from) . '" to ' .
+				'"' . unixtime_datetime($to) . '"' . PHP_EOL
+			;
+			# query the API for the missing records
 			$pq['start'] = min($from, $to);
 			$pq['stop'] = max($to, $from);
-			price_query($config, $pq);
+			$response_x = price_query($config, $pq);
+			$response['msg'] .= $response_x['msg'];
+			$response['count'] += $response_x['count'];
 			# check if missing record is returned
+			# query both existing records and any new in between
 			$query_sub = "
-				SELECT * FROM price_history
-				WHERE pair = '" . $pq['pair'] . "'
-				AND source = '" . $pq['source'] . "'
-				AND period = '" . $config['period'][$pq['period']] . "'" .
-				/* query records from either side of the missing record(s) */
+				SELECT
+				timestamp,
+				open,
+				close,
+				high,
+				low,
+				volume
+				FROM price_history
+				WHERE pair_id = '" . $pq['pair_id'] . "' " .
+				/* query records from either side of the missing records */
 				"AND timestamp >= " . ($from - $pq['period_ms']) . "
 				AND timestamp <= " . ($to + $pq['period_ms']) .
 				/* option to not impute values from today or yesterday */
@@ -639,163 +668,200 @@ function price_missing($config, $history, $pq) {
 				" ORDER BY timestamp
 			";
 			$sub_hist = query($query_sub, $config);
-			# check if missing records have now been updated
-			if (empty($sub_hist) || count($sub_hist) < 2) break 1;
-			# otherwise impute missing records
+			# if any missing records have now been updated with price_query
+			# then we will skip imputing them below
+			# otherwise impute remaining missing records
 			# create array of timestamps
 			$timestamps = array();
 			foreach ($sub_hist as $sub) array_push($timestamps, $sub['timestamp']);
+			# count imputations
+			$imputed = 0;
 			# process each timestamp
 			for ($j = 1; $j < count($timestamps); $j++) {
+				if ($config['debug']) $response['msg'] .= 'timestamp pair ' . $j . ' of ' . (count($timestamps) - 1) . PHP_EOL;
 				$from = $timestamps[$j - 1];
 				# check timestamp array is valid
 				if (!isset($timestamps[$j])) {
-					echo 'ERROR $j: ' . $j . PHP_EOL;
-					var_dump($timestamps);
-					die;
+					$response['msg'] = 'failed: imputing timestamps for pair_id ' . $pq['pair_id'];
+					$response['alert'] = TRUE;
+					$response['die'] = TRUE;
+					return $response;
 				}
 				$to = $timestamps[$j];
 				# count missing records
-				$iter = ($to - $from) / $pq['period_ms'];
+				$iter = (($to - $from) / $pq['period_ms']) - 1;
+				if ($iter == 0) continue 1;
+				if ($config['debug']) $response['msg'] .= $iter . ' to impute for this timestamp pair' . PHP_EOL;
 				# if there will be a long string of missing records, exit
 				# accounting for weekends
-				if ($pq['weekends']) {
-					if ($iter > $config['obs_imp_max']) continue 1;
-				} else {
-					$wmiss = count_on_weekends($from, $to, $pq['period_ms']);
-					if ($iter - $wmiss > $config['obs_imp_max']) continue 1;
+				if ($pq['weekends']) $wmiss = 0;
+				else $wmiss = nobs_weekends($from, $to, $pq['period_ms']);
+				if ($iter - $wmiss > $config['obs_imp_max']) {
+					$response['msg'] .= 'imputed: no possible, ' . ($iter - $wmiss) . ' missing, max allowed is ' . $config['obs_imp_max'] . PHP_EOL;
+					continue 1;
 				}
 				# iterate for each missing record
-				for ($k = 1; $k < $iter; $k++) {
+				$imputed = 0;
+				for ($k = 1; $k <= $iter; $k++) {
 					# define imputed values using last known record
 					$values = array();
-					$values['pair'] = $pq['pair'];
-					$values['source'] = $pq['source'];
+					$values['pair_id'] = $pq['pair_id'];
+					#$values['pair'] = $pq['pair'];
+					#$values['exchange'] = $pq['exchange'];
 					$values['timestamp'] = $from + $k * $pq['period_ms'];
-					$values['period'] = $sub_hist[$j - 1]['period'];
+					#$values['period'] = $sub_hist[$j - 1]['period'];
 					$values['open'] = $sub_hist[$j - 1]['open'];
 					$values['close'] = $sub_hist[$j - 1]['close'];
 					$values['high'] = $sub_hist[$j - 1]['high'];
 					$values['low'] = $sub_hist[$j - 1]['low'];
 					$values['volume'] = $sub_hist[$j - 1]['volume'];
 					$values['imputed'] = 1;
-					if ($config['debug']) var_dump($values);
+					if ($config['debug']) $response['msg'] .= var_export($values, TRUE);
 					# update database
-					query('update_history', $config, $values);
+					$imputed += query('insert_price_history', $config, $values);
 				}
+				$response['msg'] .= 'imputed: ' . $imputed . ' records ' . PHP_EOL;
+				$response['count'] += $imputed;
 			}
 		}
 	}
+
+	return $response;
 
 }
 
 /* for any imputed records, try to retrieve actual records */
 
-function price_history_imputed($config) {
+function price_history_imputed($config, $pair_id = FALSE) {
+
+	$response = $config['response'];
+
+	$replaceable = FALSE;
 
 	$query = "SELECT * FROM asset_pairs WHERE collect";
+	if ($pair_id) $query .= " AND pair_id = '" . $pair_id . "'";
 	$pairs = query($query, $config);
 
 	if (!empty($pairs))
 	foreach ($pairs as $pair) {
 
-		print_r($pair);
+		if ($config['debug']) $response['msg'] .= var_export($pair, TRUE);
 
 		# define exchange parameters
-		$config['exchange'] = $pair['source'];
+		$config['exchange'] = $pair['exchange'];
 		$config = config_exchange($config);
 
 		# array format defined in config.php
 		$pq = $config['price_query'];
 		$pq['pair_id'] = $pair['pair_id'];
 		$pq['pair'] = $pair['pair'];
-		$pq['source'] = $pair['source'];
+		#$pq['exchange'] = $pair['exchange'];
 		$pq['period'] = $pair['period'];
 		$pq['period_ms'] = $pq['period'] * 60000;
 		$pq['obs_iter'] = $config['obs_iter_max'];
+		$pq['weekends'] = weekends($pair['class']);
 
 		# query imputed records
 		$query_sub = "
-			SELECT * FROM price_history
-			WHERE pair = '" . $pq['pair'] . "'
-			AND source = '" . $pq['source'] . "'
-			AND period = '" . $config['period'][$pq['period']] . "'
+			SELECT history_id, timestamp
+			FROM price_history
+			WHERE pair_id = '" . $pq['pair_id'] . "'
 			AND imputed = 1
+		";
+		# if not reported weekends, limit query to mon (0) to fri (4)
+		if (!$pq['weekends']) $query_sub .= "
+			AND weekday(from_unixtime((timestamp / 1000))) < 5
+		";
+		$query_sub .= "
 			ORDER BY timestamp
 		";
 		$sub_hist = query($query_sub, $config);
 
 		# check if imputed records exist
 		if (empty($sub_hist)) continue 1;
-
-		# check if the asset pair is only reported on weekends
-		/*
-		if (!$pq['weekends']) {
-			$missing = count_on_weekends($from, $to, $period_ms);
-			if (!$missing) continue 1;
-		}
-		*/
+		$replaceable = TRUE;
 
 		# create array of timestamps
 		$timestamps = array();
 		foreach ($sub_hist as $sub) array_push($timestamps, $sub['timestamp']);
 
-		$count = count($timestamps);
-		if ($count == 1) $count = 2;
+		# count replace records
+		$inserted = 0;
 
+		# attempt to replace records
 		$pq['start'] = $timestamps[0];
+		$count = count($timestamps);
+
+		if ($count == 1) {
+			$pq['start'] = $timestamps[0];
+			$pq['stop'] = $timestamps[0];
+			$response_x = price_query($config, $pq);
+			$response['msg'] .= $response_x['msg'];
+			$inserted += $response_x['count'];
+		} else
+
 		for ($j = 1; $j < $count; $j++) {
 			# check if timestamp is not a sequence with the previous one
 			if ($timestamps[$j] - $timestamps[$j - 1] !== $pq['period_ms']) {
 				# if it is a new sequence then query the previous sequence
 				$pq['stop'] = $timestamps[$j - 1];
-				# query the API for the missing record(s)
-				price_query($config, $pq);
+				# query the API for the missing records
+				$response_x = price_query($config, $pq);
+				$response['msg'] .= $response_x['msg'];
+				$inserted += $response_x['count'];
 				# define the new sequence
 				$pq['start'] = $timestamps[$j];
 			}
 			# check if the final timestamp
-			if ($j == $count) {
+			if ($j == ($count - 1)) {
 				# query the final sequence
 				$pq['stop'] = $timestamps[$j];
-				price_query($config, $pq);
+				$response_x = price_query($config, $pq);
+				$response['msg'] .= $response_x['msg'];
+				$inserted += $response_x['count'];
 			}
 		}
+		$response['msg'] .=
+			'query: found ' . $inserted .
+			' actual records to replace ' .
+			$count . ' imputed records for pair_id ' .
+			$pq['pair_id'] .
+			PHP_EOL
+		;
+		$response['count'] += $inserted;
+
+		# if records were replaced, reclaculate the technical analysis
+		if ($inserted) {
+			$response_x = technical_analysis($config, $pq['pair_id'], $timestamps[0]);
+			$response['msg'] .= $response_x['msg'];
+		}
 	}
+
+	if (!$replaceable) $response['msg'] .= 'result: no replaceable imputed records';
+
+	return $response;
+
 }
 
-function info_uniswap($config) {
+/* get last price for pair */
 
-	# https://uniswap.org/docs/v2/API/queries/#pair-data
-	# create as array, then json_encode
-	/*
-	$query = '
-{
-pair(id: "0xa478c2975ab1ea89e8196811f51a7b7ade33eb11"){
-		 token0 {
-			 id
-			 symbol
-			 name
-			 derivedETH
-		 }
-		 token1 {
-			 id
-			 symbol
-			 name
-			 derivedETH
-		 }
-		 reserve0
-		 reserve1
-		 reserveUSD
-		 trackedReserveETH
-		 token0Price
-		 token1Price
-		 volumeUSD
-		 txCount
- }
-}';
+function price_last($config, $pair) {
 
-		$config['url'] = $config['url_uniswap_graph'] . $query;
-*/
+	$response = $config['response'];
+
+	switch($config['exchange']) {
+
+		case 'okex_spot':
+		case 'okex_margin':
+			$config['api_request'] = $config['pairs_info'] . str_replace('/', '-', $pair) . '/ticker';
+			$config['url'] .= $config['api_request'];
+			$result = query_api($config);
+			$response['result']['lowest_sell'] = $result['best_ask'];
+			$response['result']['highest_buy'] = $result['best_bid'];
+		break;
+
+	}
+
+	return $response;
 
 }

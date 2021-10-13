@@ -1,7 +1,11 @@
 <?php
 
-include('functions.php');
+echo '<pre>';
+
 include('functions.util.php');
+include('functions.api.php');
+include('functions.investments.php');
+include('functions.account.php');
 include('functions.order.php');
 include('functions.history.php');
 include('functions.tactics.php');
