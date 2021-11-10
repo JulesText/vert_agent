@@ -25,6 +25,10 @@ query("SET time_zone = '" . $config['timezone_sql'] . "'", $config);
 $config['debug'] = FALSE;
 $config['debug_sql'] = FALSE;
 
+/* record error messages to log, typically for maintenance bot to find and email alert */
+
+$config['error_log'] = TRUE;
+
 /* cURL parameters */
 
 $config['accept'] = 'application/json';
@@ -40,7 +44,6 @@ $config['response'] = array(
 	'msg' => '',
 	'config' => array(),
 	'error' => FALSE,
-	'die' => FALSE,
 	'alert' => FALSE,
 	'count' => 0,
 	'result' => array()

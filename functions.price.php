@@ -684,7 +684,7 @@ function price_missing($config, $history, $pq) {
 				if (!isset($timestamps[$j])) {
 					$response['msg'] = 'failed: imputing timestamps for pair_id ' . $pq['pair_id'];
 					$response['alert'] = TRUE;
-					$response['die'] = TRUE;
+					$response['error'] = TRUE;
 					return $response;
 				}
 				$to = $timestamps[$j];

@@ -49,7 +49,7 @@ if (date_default_timezone_get() == $config['timezone_php']) {
 } else {
 	$response['msg'] = 'failed: ' . $test . ', currently ' . date_default_timezone_get();
 	$response['alert'] = $alert;
-	$response['die'] = $die;
+	$response['error'] = $die;
 }
 process($response, $config);
 
@@ -61,7 +61,7 @@ if (version_compare(phpversion(),"8.0.0",'<')
 } else {
 	$response['msg'] = 'failed: ' . $test;
 	$response['alert'] = $alert;
-	$response['die'] = $die;
+	$response['error'] = $die;
 }
 process($response, $config);
 
@@ -73,7 +73,7 @@ if (ini_get('memory_limit') == $config['memory_limit']) {
 } else {
 	$response['msg'] = 'failed: ' . $test . ', currently ' . ini_get('memory_limit');
 	$response['alert'] = $alert;
-	$response['die'] = $die;
+	$response['error'] = $die;
 }
 process($response, $config);
 
@@ -85,7 +85,7 @@ if ($config['sql_link']) {
 } else {
 	$response['msg'] = 'failed: ' . $test;
 	$response['alert'] = $alert;
-	$response['die'] = $die;
+	$response['error'] = $die;
 }
 process($response, $config);
 
@@ -97,7 +97,7 @@ if ($result[0]['@@session.time_zone'] == $config['timezone_sql']) {
 } else {
 	$response['msg'] = 'failed: ' . $test . ', currently ' . $result[0]['@@session.time_zone'];
 	$response['alert'] = $alert;
-	$response['die'] = $die;
+	$response['error'] = $die;
 }
 process($response, $config);
 
@@ -111,7 +111,7 @@ if ($response_x['ok'] == TRUE) {
 } else {
 	$response['msg'] = 'failed: ' . $test;
 	$response['alert'] = $alert;
-	$response['die'] = $die;
+	$response['error'] = $die;
 }
 process($response, $config);
 
@@ -125,7 +125,7 @@ if ($response_x['ok'] == TRUE) {
 } else {
 	$response['msg'] = 'failed: ' . $test;
 	$response['alert'] = $alert;
-	$response['die'] = $die;
+	$response['error'] = $die;
 }
 process($response, $config);
 
@@ -170,7 +170,7 @@ foreach ($exchanges as $config['exchange']) {
 			var_export($result, TRUE)
 		;
 		$response['alert'] = $alert;
-		$response['die'] = $die;
+		$response['error'] = $die;
 	}
 	process($response, $config);
 }
@@ -242,7 +242,7 @@ foreach ($queries_values as $values) {
 		$response['msg'] = 'error: ' . $config['sql_link']->error;
 		$response['msg'] .= PHP_EOL . 'failed: ' . $test . var_export($values, TRUE);
 		$response['alert'] = $alert;
-		$response['die'] = $die;
+		$response['error'] = $die;
 		process($response, $config);
 	}
 	array_push($pair_ids, $id);
@@ -383,7 +383,7 @@ foreach ($queries_values as $values) {
 		$response['msg'] = 'error: ' . $config['sql_link']->error;
 		$response['msg'] .= PHP_EOL . 'failed: ' . $test . var_export($values, TRUE);
 		$response['alert'] = $alert;
-		$response['die'] = $die;
+		$response['error'] = $die;
 		process($response, $config);
 	}
 	array_push($tactic_ids, $id);
@@ -405,7 +405,7 @@ foreach ($pair_ids as $pair_id) {
 	$response['count'] += $response_x['count'];
 	$response['msg'] .= $response_x['msg'] . PHP_EOL;
 	if ($response_x['die']) {
-		$response['die'] = $die;
+		$response['error'] = $die;
 		$response['alert'] = $alert;
 		process($response, $config);
 	}
@@ -414,7 +414,7 @@ if ($response['count']) {
 	$response['msg'] .= 'ok: ' . $response['count'] . ' records inserted or imputed';
 } else {
 	$response['msg'] .= 'failed: expecting > 0 records inserted or imputed';
-	$response['die'] = $die;
+	$response['error'] = $die;
 	$response['alert'] = $alert;
 }
 process($response, $config);
@@ -433,7 +433,7 @@ foreach ($pair_ids as $pair_id) {
 		$response['msg'] .= 'reset: wound back currency by 5 periods for pair_id ' . $pair_id . PHP_EOL;
 	} else {
 		$response['msg'] .= 'failed: unable to wind back currency for pair_id ' . $pair_id . PHP_EOL;
-		$response['die'] = $die;
+		$response['error'] = $die;
 		$response['alert'] = $alert;
 		process($response, $config);
 	}
@@ -441,7 +441,7 @@ foreach ($pair_ids as $pair_id) {
 	$response['count'] += $response_x['count'];
 	$response['msg'] .= $response_x['msg'] . PHP_EOL;
 	if ($response_x['die']) {
-		$response['die'] = $die;
+		$response['error'] = $die;
 		$response['alert'] = $alert;
 		process($response, $config);
 	}
@@ -450,7 +450,7 @@ if ($response['count']) {
 	$response['msg'] .= 'ok: ' . $response['count'] . ' records inserted';
 } else {
 	$response['msg'] .= 'failed: expecting > 0 records inserted';
-	$response['die'] = $die;
+	$response['error'] = $die;
 	$response['alert'] = $alert;
 }
 process($response, $config);
@@ -464,7 +464,7 @@ $result = query($query, $config);
 $history_id = $result[0]['MIN(history_id)'];
 if (!is_numeric($history_id) || $history_id == 0) {
 	$response['msg'] .= 'failed: ' . PHP_EOL . $query;
-	$response['die'] = $die;
+	$response['error'] = $die;
 	$response['alert'] = $alert;
 	process($response, $config);
 }
@@ -480,7 +480,7 @@ if ($result == $i) {
 	$response['msg'] .= 'ok: ' . $i . ' deleted';
 } else {
 	$response['msg'] .= 'failed: ' . PHP_EOL . $query . $query_sub;
-	$response['die'] = $die;
+	$response['error'] = $die;
 	$response['alert'] = $alert;
 }
 process($response, $config);
@@ -518,7 +518,7 @@ if ($response_x['count'] == $i) {
 	$response['msg'] .= "ok: {$i} missing records inserted";
 } else {
 	$response['msg'] .= "failed: expecting {$i} missing records inserted";
-	$response['die'] = $die;
+	$response['error'] = $die;
 	$response['alert'] = $alert;
 }
 process($response, $config);
@@ -569,7 +569,7 @@ if ($response_x['count'] == $i) {
 	$response['msg'] .= "ok: {$i} records imputed";
 } else {
 	$response['msg'] .= "failed: expecting {$i} records imputed";
-	$response['die'] = $die;
+	$response['error'] = $die;
 	$response['alert'] = $alert;
 }
 process($response, $config);
@@ -586,7 +586,7 @@ if ($response_x['count'] == $i) {
 	$response['msg'] .= "ok: {$i} records updated with actual figures";
 } else {
 	$response['msg'] .= "failed: expecting {$i} records updated";
-	$response['die'] = $die;
+	$response['error'] = $die;
 	$response['alert'] = $alert;
 }
 process($response, $config);
@@ -600,7 +600,7 @@ if ($response_x['count'] > 0) {
 	$response['msg'] .= "ok: analysis calculated on {$response_x['count']} cells";
 } else {
 	$response['msg'] .= "failed: expecting records updated";
-	$response['die'] = $die;
+	$response['error'] = $die;
 	$response['alert'] = $alert;
 }
 process($response, $config);
@@ -632,7 +632,7 @@ if (!$trade) {
 	$result = query('select_tactics', $config, $values);
 	if (empty($result)) {
 		$response['msg'] .= "failed: select_tactics {$values['filterquery']}, expecting tactic with action for market/limit order" . PHP_EOL;
-		$response['die'] = $die;
+		$response['error'] = $die;
 		$response['alert'] = $alert;
 	} else {
 		$count = count($result);
@@ -644,7 +644,7 @@ if (!$trade) {
 	$result = query('select_tactics', $config, $values);
 	if (empty($result)) {
 		$response['msg'] .= "failed: select_tactics {$values['filterquery']}, expecting tactic with action for delete order";
-		$response['die'] = $die;
+		$response['error'] = $die;
 		$response['alert'] = $alert;
 	} else {
 		$count = count($result);
@@ -667,7 +667,7 @@ if ($trade) {
 		$response['msg'] .= PHP_EOL . $response_x['msg'] . PHP_EOL;
 		if (array_search($response_x['result'][$id], array('actionable', 'executed')) === FALSE) {
 			$response['msg'] .= 'failed: conditions did not satisfy for tactic_id ' . $id;
-			$response['die'] = $die;
+			$response['error'] = $die;
 			$response['alert'] = $alert;
 		} else {
 			$response['msg'] .= 'ok: conditions satisfied for tactic_id ' . $id;
@@ -695,7 +695,7 @@ if ($trade) {
 		$response['msg'] .= 'ok: order placed';
 	} else {
 		$response['msg'] .= 'failed: order not placed';
-		$response['die'] = $die;
+		$response['error'] = $die;
 		$response['alert'] = $alert;
 	}
 	process($response, $config);
@@ -720,7 +720,7 @@ if ($trade && $ordered) {
 		$response['msg'] .= 'ok: order executed ';
 	} else {
 		$response['msg'] .= 'failed: order not executed';
-		$response['die'] = $die;
+		$response['error'] = $die;
 		$response['alert'] = $alert;
 	}
 	process($response, $config);
@@ -778,7 +778,7 @@ if ($trade && $ordered && $executed) {
 		}
 	}
 	if (!$recorded) {
-		$response['die'] = $die;
+		$response['error'] = $die;
 		$response['alert'] = $alert;
 	}
 	process($response, $config);
@@ -793,7 +793,7 @@ if ($trade && $ordered && $executed) {
 	$response['msg'] .= $response_x['msg'] . PHP_EOL;
 	if ($response_x['result'][$tactic_id_limit] !== 'actionable') {
 		$response['msg'] .= 'failed: conditions did not satisfy for tactic_id ' . $tactic_id_limit . PHP_EOL;
-		$response['die'] = $die;
+		$response['error'] = $die;
 		$response['alert'] = $alert;
 	} else {
 		$response['msg'] .= 'ok: conditions satisfied for tactic_id ' . $tactic_id_limit . PHP_EOL . PHP_EOL;
@@ -809,7 +809,7 @@ if ($trade && $ordered && $executed) {
 		$response['msg'] .= $response_x['msg'] . PHP_EOL;
 		if (!$ordered) {
 			$response['msg'] .= 'failed: order not placed';
-			$response['die'] = $die;
+			$response['error'] = $die;
 			$response['alert'] = $alert;
 		} else {
 			$response['msg'] .= 'ok: order placed ' . PHP_EOL . PHP_EOL;
@@ -853,7 +853,7 @@ if ($trade && $ordered && $executed) {
 		}
 	}
 	if (!$deleted) {
-		$response['die'] = $die;
+		$response['error'] = $die;
 		$response['alert'] = $alert;
 	}
 	process($response, $config);
@@ -875,8 +875,8 @@ if (isset($_GET['debug']) && $_GET['debug'] == 'TRUE') {
 	$response = $config['response'];
 	$response['msg'] = $sep . "not deleting records inserted into database, to allow manual inspection ..." . PHP_EOL . PHP_EOL;
 	$response['msg'] .= "completed";
-	$response['die'] = TRUE;
 	process($response, $config);
+	die;
 }
 
 
@@ -894,7 +894,7 @@ if ($result == count($pair_ids)) {
 		$pair_ids_str;
 } else {
 	$response['msg'] = 'failed: unable to delete all test records from assets_pairs table' . $pair_ids_str;
-	$response['die'] = $die;
+	$response['error'] = $die;
 	$response['alert'] = $alert;
 }
 process($response, $config);
@@ -958,7 +958,7 @@ if ($result == count($tactic_ids)) {
 		PHP_EOL;
 } else {
 	$response['msg'] .= 'failed: unable to delete all test records from tactics table' . $tactic_ids_str;
-	$response['die'] = $die;
+	$response['error'] = $die;
 	$response['alert'] = $alert;
 }
 process($response, $config);

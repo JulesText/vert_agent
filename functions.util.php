@@ -4,8 +4,11 @@
 
 function process($response, $config) {
 
+	/* if error, initiate error report and die */
+	if ($response['error'] !== FALSE) error($response['msg'], $config['error_log']);
+
 	/* print notification on screen */
-	if ($response['msg'] !== '' && !$response['die']) echo $response['msg'] . PHP_EOL;
+	if ($response['msg'] !== '') echo $response['msg'] . PHP_EOL;
 
 	/* send notification message to alert bot */
 	if ($response['alert']) {
@@ -18,9 +21,6 @@ function process($response, $config) {
 		;
 		query_api($config, $default_headers = TRUE);
 	}
-
-	/* terminate all processes after recording error */
-	if ($response['die']) error($response['msg']);
 
 }
 
@@ -177,14 +177,18 @@ function decimals($d) {
 
 }
 
-/* write error to log and terminate */
+/* write error to log, display error and terminate */
 
-function error($msg) {
+function error($msg, $error_log = TRUE) {
 
-	$log = fopen('error_log', 'a');
-	fwrite($log, $msg . PHP_EOL);
-	fclose($log);
-	die($msg);
+	if ($error_log) {
+		$log = fopen('error_log', 'a');
+		fwrite($log, $msg . PHP_EOL);
+		fclose($log);
+	}
+	$sep = '-------------------------------' . PHP_EOL;
+	$sep = PHP_EOL . $sep . $sep;
+	die($sep . 'error' . $sep . $msg);
 
 }
 

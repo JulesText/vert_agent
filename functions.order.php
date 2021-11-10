@@ -185,7 +185,7 @@ function place_order($config, $order_query, $orderId = '') {
 			if (strlen($order['id']) !== 32) {
 				$response['msg'] = 'incorrect order id for ascendex';
 				$response['alert'] = TRUE;
-				$response['die'] = TRUE;
+				$response['error'] = TRUE;
 				return $response;
 			}
 			$order['time'] = (int)$config['timestamp'];
@@ -480,7 +480,7 @@ function place_loan($config, $loan, $loanId = '') {
 			if (strlen($order['id']) !== 32) {
 				$response['msg'] = 'incorrect order id for ascendex';
 				$response['alert'] = TRUE;
-				$response['die'] = TRUE;
+				$response['error'] = TRUE;
 				return $response;
 			}
 			$order['time'] = (int)$config['timestamp'];

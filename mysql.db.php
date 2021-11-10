@@ -11,15 +11,26 @@ function query($querylabel, $config, $values=NULL) {
 	# perform query
 	$result = doQuery($query, $config);
 
-	# for testing only: display query
-	if ($config['debug_sql']) {
-		$response = $config['response'];
-		$response['msg'] .=
-			'Query: ' . $querylabel . PHP_EOL .
-			'Values: ' . var_export($values, TRUE) . PHP_EOL .
-			'Result: ' . var_export($result, TRUE) . PHP_EOL
+	# for debugging
+	if (!$result || $config['debug_sql']) {
+		$sql_response =
+			PHP_EOL . '## SQL start' . PHP_EOL . PHP_EOL .
+			'> query: ' . $querylabel . PHP_EOL .
+			'> values: ' . var_export($values, TRUE) . PHP_EOL .
+			'> result: ' . var_export($result, TRUE) . PHP_EOL .
+			'> last insert id: ' . mysqli_insert_id($config['sql_link']) . PHP_EOL .
+			'> error: ' . PHP_EOL . mysqli_error($config['sql_link']) . PHP_EOL . PHP_EOL .
+			'## SQL end' . PHP_EOL
 		;
-		process($response);
+		if ($result === FALSE) {
+			$response = $config['response'];
+			$response['msg'] .= $sql_response;
+			$response['error'] = TRUE;
+			process($response, $config);
+		}
+		else if ($config['debug_sql']) {
+			echo $sql_response;
+		}
 	}
 
 	return $result;
