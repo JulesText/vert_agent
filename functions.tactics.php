@@ -318,6 +318,8 @@ function conditional_tactics($config, $tactic_ids = FALSE) {
 	# process each tactic
 	foreach ($tactics as $t) {
 
+		$response['msg'] .= PHP_EOL . 'processed tactic_id ' . $t['tactic_id'] . PHP_EOL;
+
 		$update = FALSE;
 
 		/*
@@ -444,6 +446,9 @@ function conditional_tactics($config, $tactic_ids = FALSE) {
 		) {
 			if ($t['action'] == 'none') {
 				$t['status'] = 'executed';
+			} else if ($t['action'] == 'alert') {
+				$response['alert'] = TRUE;
+				$t['status'] = 'executed';
 			} else {
 				$t['status'] = 'actionable';
 				if (!is_null($t['from_amount'])) $amount = ($t['from_amount'] + 0) . ' ';
@@ -487,9 +492,9 @@ function conditional_tactics($config, $tactic_ids = FALSE) {
 	}
 
 	if (empty($tactics)) {
-		$response['msg'] .= 'no tactics found' . PHP_EOL;
+		$response['msg'] .= PHP_EOL . 'no tactics found' . PHP_EOL;
 	} else {
-		$response['msg'] .= count($tactics) . ' tactics found, ';
+		$response['msg'] .= PHP_EOL . count($tactics) . ' tactics found, ';
 		if (empty($response['result']))
 			$response['msg'] .= '0 updated' . PHP_EOL;
 		else

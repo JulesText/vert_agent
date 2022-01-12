@@ -12,8 +12,15 @@ function process($response, $config) {
 
 	/* send notification message to alert bot */
 	if ($response['alert']) {
+		// html output is not developed yet
 		// if api returns html, this will throw an error
+		// so use strip_tags to remove html code
 		$response['msg'] = strip_tags($response['msg']);
+		// and also replace < and > symbols within plain text
+		$response['msg'] = str_replace('<=', 'LE', $response['msg']);
+		$response['msg'] = str_replace('<', 'LT', $response['msg']);
+		$response['msg'] = str_replace('>=', 'GE', $response['msg']);
+		$response['msg'] = str_replace('>', 'GT', $response['msg']);
 		$config['url'] =
 			$config['chat_url'] .
 			'/sendMessage?chat_id=' . $config['chat_id'] .
