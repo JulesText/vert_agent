@@ -2,7 +2,7 @@
 
 include('system_includes.php');
 
-# process.transactions.php?exchange=okex&account=margin&pair=CVP/USDT
+# transaction_process.php?exchange=okex&account=margin&pair=CVP/USDT
 if (isset($_GET['exchange'])) { $exchange = $_GET['exchange']; } else { $exchange = ''; }
 if (isset($_GET['pair'])) { $pair = $_GET['pair']; } else { $pair = ''; }
 

@@ -117,7 +117,7 @@ class APIREST {
 			if ($curl === FALSE)
 				throw new Exception('Failed to initialize');
 
-			$verbose = fopen('api_log', 'w+');
+			$verbose = fopen('error_log_api', 'w+');
 			$curl_opt = array(
 				CURLOPT_URL => $this->url,
 				CURLOPT_RETURNTRANSFER => TRUE,

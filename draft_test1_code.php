@@ -1,7 +1,7 @@
 <?php
 
 include('system_includes.php');
-include('functions.test1.php');
+include('draft_test1_functions.php');
 $sep = PHP_EOL . '-------------------------------' . PHP_EOL;
 $sep2 = $sep . '-------------------------------' . PHP_EOL;
 $sep .= PHP_EOL;

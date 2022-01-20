@@ -1,27 +1,27 @@
 <?php
 
 /*
-default: error_checks.php
+default: system_diagnostic.php
 	execute via browser, prints results on screen
-automated: error_checks.php?alert=TRUE
+automated: system_diagnostic.php?alert=TRUE
 	execute via cron job, sends error messages to alert bot
-trade: error_checks.php?trade=TRUE
+trade: system_diagnostic.php?trade=TRUE
 	execute live trades, from USDT to ETH and back with market order
 	expects 20 USDT in account
-exchange: error_checks.php?exchange=name
+exchange: system_diagnostic.php?exchange=name
 	limit connection test to single exchange
-die: error_checks.php?die=FALSE
+die: system_diagnostic.php?die=FALSE
 	ignore fatal errors
-convert_timestamps: error_checks.php?convert_timestamps=TRUE
+convert_timestamps: system_diagnostic.php?convert_timestamps=TRUE
 	update timestamps from unix times in database
-debug: error_checks.php?debug=TRUE
+debug: system_diagnostic.php?debug=TRUE
 	do not delete records inserted into database, to allow manual inspection
-truncate_tactics: error_checks.php?truncate_tactics=TRUE
+truncate_tactics: system_diagnostic.php?truncate_tactics=TRUE
 	delete all tactics in database, use with caution
-truncate_pairs: error_checks.php?truncate_pairs=TRUE
+truncate_pairs: system_diagnostic.php?truncate_pairs=TRUE
 	delete all asset_pairs in database, use with caution
 	option to retain asset pairs, for instance
-	error_checks.php?truncate_pairs=TRUE&retain_pairs=1,17,26
+	system_diagnostic.php?truncate_pairs=TRUE&retain_pairs=1,17,26
 */
 
 include('system_includes.php');

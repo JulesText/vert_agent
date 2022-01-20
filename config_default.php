@@ -109,7 +109,7 @@ $config['price_query'] = array(
 
 $config['obs_iter_max'] = 100; # default maximum number of observations for each API call
 $config['obs_hist_max'] = 0; # if API server supports default maximum number of observations for each API call
-$config['obs_curr_max'] = 100; # buffer the demand for price_recent.php, will be repeating every 5 minutes anyway
+$config['obs_curr_max'] = 100; # buffer the demand for price_process.php, will be repeating every 5 minutes anyway
 
 $config['obs_imp_max'] = 10; # maximum number of consecutive missing price records to impute
 
