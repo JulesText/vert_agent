@@ -1,6 +1,6 @@
 <?php
 
-include('includes.php');
+include('system_includes.php');
 
 $response = check_tactics_ext($config);
 $response['msg'] = 'check_tactics_ext: ' . $response['msg'];
@@ -10,4 +10,4 @@ $response = process_tactics_ext($config);
 $response['msg'] = 'process_tactics_ext: processed ' . $response['count'] . ' tactics_external' . PHP_EOL . $response['msg'];
 process($response, $config);
 
-include('system_metrics.php');
+include('system_speed.php');

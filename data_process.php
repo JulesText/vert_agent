@@ -1,6 +1,6 @@
 <?php
 
-include('includes.php');
+include('system_includes.php');
 
 $response = price_history_trim($config);
 process($response, $config);
@@ -14,4 +14,4 @@ process($response, $config);
 $response = convert_timestamps($config);
 process($response, $config);
 
-include('system_metrics.php');
+include('system_speed.php');

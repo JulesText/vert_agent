@@ -1,6 +1,6 @@
 <?php
 
-include('includes.php');
+include('system_includes.php');
 
 $query = "SELECT content_id, source, url, timestamp, notified FROM web_content";
 $sentiments = query($query, $config);
@@ -42,4 +42,4 @@ foreach ($sentiments as $sentiment) {
 
 }
 
-include('system_metrics.php');
+include('system_speed.php');

@@ -1,6 +1,6 @@
 <?php
 
-include('includes.php');
+include('system_includes.php');
 
 if (isset($_GET['exchange'])) { $config['exchange'] = $_GET['exchange']; } else { $config['exchange'] = ''; }
 if (isset($_GET['query'])) { $query = $_GET['query']; } else { $query = ''; }
@@ -287,4 +287,4 @@ if ($query == 'convert_timestamps') {
 
 process($response, $config);
 
-include('system_metrics.php');
+include('system_speed.php');

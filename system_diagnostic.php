@@ -24,7 +24,7 @@ truncate_pairs: error_checks.php?truncate_pairs=TRUE
 	error_checks.php?truncate_pairs=TRUE&retain_pairs=1,17,26
 */
 
-include('includes.php');
+include('system_includes.php');
 if (isset($_GET['alert']) && $_GET['alert'] == 'TRUE') $alert = TRUE;
 else $alert = FALSE;
 if (isset($_GET['die']) && $_GET['die'] == 'FALSE') $die = FALSE;
@@ -981,4 +981,4 @@ $response['msg'] .= 'error checks passed' . PHP_EOL . PHP_EOL;
 $response['msg'] .= 'manually inspect any warnings' . PHP_EOL;
 process($response, $config);
 
-include('system_metrics.php');
+include('system_speed.php');

@@ -2,17 +2,17 @@
 
 echo '<pre>';
 
-include('functions.util.php');
-include('functions.api.php');
-include('functions.investments.php');
-include('functions.account.php');
-include('functions.order.php');
-include('functions.history.php');
-include('functions.tactics.php');
-include('functions.analysis.php');
-include('functions.price.php');
-include('mysql.inc.php');
-include('mysql.db.php');
+include('account_functions.php');
+include('analysis_functions.php');
+include('api_functions.php');
+include('db_functions.php');
+include('investment_functions.php');
+include('order_functions.php');
+include('price_functions.php');
+include('system_functions.php');
+include('tactic_functions.php');
+include('transaction_functions.php');
+
 include('config.php');
 
 // php closing tags have been omitted deliberately, to avoid unwanted blank lines being sent to the browser

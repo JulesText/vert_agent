@@ -1,6 +1,6 @@
 <?php
 
-include('includes.php');
+include('system_includes.php');
 
 $sep = '-------------------------------' . PHP_EOL;
 
@@ -42,4 +42,4 @@ if (!empty($changed_ids)) {
 
 echo $sep;
 
-include('system_metrics.php');
+include('system_speed.php');

@@ -1,6 +1,6 @@
 <?php
 
-include('includes.php');
+include('system_includes.php');
 
 # https://www.php.net/manual/en/ref.trader.php
 
@@ -10,7 +10,7 @@ else $pair_id = FALSE;
 $response = technical_analysis($config, $pair_id);
 process($response, $config);
 
-include('system_metrics.php');
+include('system_speed.php');
 
 /*
 

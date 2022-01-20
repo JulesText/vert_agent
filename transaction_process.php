@@ -1,6 +1,6 @@
 <?php
 
-include('includes.php');
+include('system_includes.php');
 
 # process.transactions.php?exchange=okex&account=margin&pair=CVP/USDT
 if (isset($_GET['exchange'])) { $exchange = $_GET['exchange']; } else { $exchange = ''; }
@@ -14,4 +14,4 @@ $response = calculate_aud($config, TRUE);
 $response['msg'] = 'calculate_aud' . PHP_EOL . $response['msg'];
 process($response, $config);
 
-include('system_metrics.php');
+include('system_speed.php');
