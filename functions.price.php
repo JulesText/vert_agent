@@ -174,6 +174,15 @@ function price_query($config, $pq) {
 					$values['volume'] = $price[5];
 				}
 
+
+				/*
+				new code snippet
+				if delete from ana_price_history on query,
+				first check if price has changed
+				if so delete from ana_price first
+				*/
+
+
 				# save row
 				$inserted += query('insert_price_history', $config, $values);
 				# get timestamp range

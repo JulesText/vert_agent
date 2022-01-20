@@ -9,6 +9,13 @@ function technical_analysis($config, $pair_ids = FALSE, $backdate = FALSE) {
 	# values in the returned arrays from trader will be rounded to this precision
 	ini_set('trader.real_precision', '18');
 
+	/*
+	new code snippet
+	SELECT FORMAT(a.value, b.decimals) as value FROM ana_price as a LEFT JOIN ana_measurement as b
+	ON a.indicator = b.indicator
+	*/
+
+
 	$query = "
 		SELECT
 		pair_id,
@@ -172,6 +179,14 @@ function technical_analysis($config, $pair_ids = FALSE, $backdate = FALSE) {
 				}
 			}
 		}
+
+
+
+		/*
+		new code snippet
+		INSERT INTO ana_price VALUES value = LEFT(value, 64) # max characters 64 as db
+		*/
+
 
 		$omit = array('history_id', 'timestamp', 'open', 'high', 'low', 'close', 'volume');
 		$updated = 0;
