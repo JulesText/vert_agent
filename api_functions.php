@@ -45,6 +45,31 @@ function http_headers($config, $default = FALSE) {
 
 		switch ($config['exchange']) {
 
+			case 'dydx':
+				$config['data'] = '';
+				$config['msg'] =
+					$config['api_request'] .
+					'+' .
+					$config['method'] .
+					'+' .
+					$config['timestamp_iso8601'] .
+					'+' .
+					$config['data']
+				;
+				var_dump($config['msg']);
+				$config['signature'] = hmac($config['msg'], $config['secret']);
+				$httpheader = array(
+					// 'Accept: ' . $config['accept'],
+					// 'Content-Type: ' . $config['content_type'],
+					'DYDX-SIGNATURE: ' . $config['signature'],
+					'DYDX-API-KEY: ' . $config['api_key'],
+					'DYDX-TIMESTAMP: ' . $config['timestamp_iso8601'],
+					'DYDX-PASSPHRASE: ' . $config['api_passphrase']
+					//,'DYDX-ACCOUNT-NUMBER: ' . $config['account_num']
+				);
+
+			break;
+
 			case 'ascendex':
 				$config['msg'] =
 					$config['timestamp'] .
@@ -63,10 +88,8 @@ function http_headers($config, $default = FALSE) {
 
 			case 'okex_spot':
 			case 'okex_margin':
-				$date = new DateTime();
-				$timestamp = $date->format('Y-m-d\TH:i:s\.000\Z'); # ISO 8601 standard format with Z
 				$config['msg'] =
-					$timestamp .
+					$config['timestamp_iso8601'] .
 					$config['method'] .
 					$config['api_request']
 				;
@@ -76,7 +99,7 @@ function http_headers($config, $default = FALSE) {
 					'Content-Type: ' . $config['content_type'],
 					'ok-access-key: ' . $config['api_key'],
 					'ok-access-sign: ' . $config['signature'],
-					'ok-access-timestamp: ' . $timestamp,
+					'ok-access-timestamp: ' . $config['timestamp_iso8601'],
 					'ok-access-passphrase: ' . $config['pass']
 					#'OK-TEXT-TO-SIGN: ' . $config['msg']
 				);

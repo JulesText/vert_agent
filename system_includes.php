@@ -12,6 +12,7 @@ include('price_functions.php');
 include('system_functions.php');
 include('tactic_functions.php');
 include('transaction_functions.php');
+include('user_functions.php');
 
 include('config.php');
 

@@ -136,6 +136,11 @@ foreach ($exchanges as $config['exchange']) {
 	$connection = FALSE;
 	$config = config_exchange($config);
 	switch ($config['exchange']) {
+		case 'dydx':
+			$config['api_request'] = $config['account_info'];
+			$config['url'] .= $config['api_request'];
+			$result = query_api($config);
+		break;
 		case 'ascendex':
 			$config['api_request'] = $config['account_info_hash'];
 			$config['url'] .= $config['account_info'];
