@@ -135,6 +135,20 @@ $config['statuses_orders'] = array( /* 1: include in history_orders(), or 0: exc
 
 $config['order_types'] = array('limit', 'market');
 
+/* tax parameters */
+
+$config['base_fiat'] = 'AUD';
+
+/*
+	Capital Gains Tax (CGT) discount
+	For an asset to qualify for the CGT discount you must own it for at least 12 months
+	before the 'CGT event' happens. The CGT event is the point at which you make a
+	capital gain or loss. You exclude the day of acquisition and the day of the CGT event
+	when working out if you owned the CGT asset for at least 12 months before the 'CGT event' happens.
+*/
+
+$config['cgt_discount_period'] = 12; # months an asset must be held
+
 /* select $config settings according to exchange */
 
 function config_exchange($config) {
@@ -265,6 +279,10 @@ function config_exchange($config) {
 			$config['api_key'] = 'ABCDEF0000000000000000000000000000';
 			$config['url'] = 'https://api.etherscan.io/api?';
 			$config['address_eth'] = '0x000ABC1230000000000000000000000000000000';
+		break;
+
+		case 'coingecko':
+			$config['url'] = 'https://api.coingecko.com/api/v3';
 		break;
 
 		case 'uniswap':

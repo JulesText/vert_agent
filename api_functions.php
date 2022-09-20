@@ -14,7 +14,7 @@ function query_api($config, $default_headers = FALSE) {
 		$response['msg'] =
 			'failed: query_api() ' . PHP_EOL .
 			'exchange: ' . $config['exchange'] . PHP_EOL .
-			'response: ' . $result['result'] . PHP_EOL .
+			'response: ' . PHP_EOL . $result['result'] . PHP_EOL .
 			'api_request: ' . $config['api_request'] . PHP_EOL
 		;
 		if ($config['debug']) $response['msg'] .= 'url: ' . $config['url'] . PHP_EOL;
@@ -146,7 +146,8 @@ class APIREST {
 				CURLOPT_RETURNTRANSFER => TRUE,
 				CURLOPT_ENCODING => "",
 				CURLOPT_MAXREDIRS => 10,
-				CURLOPT_TIMEOUT => 30, /* number of seconds to wait for response */
+				CURLOPT_TIMEOUT => 60, /* number of seconds to allow curl function to execute */
+				CURLOPT_CONNECTTIMEOUT => 60, /* number of seconds to wait for response */
 				CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
 				CURLOPT_CUSTOMREQUEST => $method,
 				CURLOPT_POSTFIELDS => $query,

@@ -4,6 +4,7 @@
 .ftpquota
 .ftpignore
 error_log
+db
 
 # installation-specific configuration
 config.php
