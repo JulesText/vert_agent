@@ -8,6 +8,7 @@ db
 
 # installation-specific configuration
 config.php
+config.json
 
 #
 # unwanted system files created by osx or windows
@@ -22,6 +23,7 @@ config.php
 *.so
 
 # OS generated files
+__pycache__
 .DS_Store
 .DS_Store?
 ._*

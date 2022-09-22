@@ -1,5 +1,19 @@
 <?php
 
+include('system_includes.php');
+
+# parameters
+set_time_limit(60);
+$fiat = $config['base_fiat'];
+$today = date('Y-m-d', $config['timestamp'] / 1000);
+$reset_txn_hist = FALSE;
+$audit = FALSE;
+$reset_balances = FALSE;
+
+# If the Fee Asset is the same as Sell Asset, then the Sell Quantity must be the net amount (after fee deduction), not gross amount.
+# If the Fee Asset is the same as Buy Asset, then the Buy Quantity must be the gross amount (before fee deduction), not net amount.
+
+
 //check issue with balance history
 // https://discord.com/channels/715804406842392586/717770762659954709/993155136920768582
 
@@ -8,6 +22,7 @@
 // I: step through txns chronologically, use covalent to query eth balance by day history of txn, compare txn_history balance to actual balance, for any block where difference noted it should be a fee-free txn so add to list in json file (and check first)
 // I: use etherscan manual ETH balance tool https://etherscan.io/balancecheck-tool
 // I: build local instance of geth and query with web3.js or similar
+// I: just make dummy record to fill unknowns
 
 
 
@@ -73,11 +88,6 @@ hence bittytax sets ETH value = 0
 
 */
 
-include('system_includes.php');
-
-$fiat = $config['base_fiat'];
-$today = date('Y-m-d', $config['timestamp'] / 1000);
-
 # change object to array
 function objectToArray ($object) {
 	if(!is_object($object) && !is_array($object)) return $object;
@@ -87,18 +97,18 @@ function objectToArray ($object) {
 $keys = array('address', 'portfolio', 'alias');
 # sorted oldest first
 $portfolios = array(
-	 ['0x7578af57e2970EDB7cB065b066C488bEce369C43', 'JK', 'J1']
+	['0x7578af57e2970EDB7cB065b066C488bEce369C43', 'JK', 'J1']
 	,['0xd898F6bfBe145d84526ec25700C2c52E04a6c240', 'JK', 'J2']
- 	// ,['0x861afbf9a062d4c8b583140c1c884529ca21e503', 'JK', 'J3']
-	// ,['0x4263891BC4469759ac035f1f3CCEb2eD87dEaA7e', 'AK', 'AK']
-	// ,['0xd5c24396683c236452A898cE45A16553358A660b', 'JK', 'J4']
-	// ,['0xE1688450ED79aD737755965c912447DF0D933b5A', 'JB', 'JB']
-	// ,['0xa2F5F0d6b64Ba1acF54418FCccfB15b99ed349e7', 'Jx', 'Jx']
-	// ,['0x5b5af4b5ab0ed2d39ea27d93e66e3366a01d7aa9', 'JK', 'J6']
-	// ,['0xb351a776afbceb74d2d3747d05cf4c3b1cc539c7', 'JK', 'J7']
-	// ,['0x4B50bfeA9c49d01616c73Edb9C73421530FfE096', 'JK', 'J8']
-	// ,['0x56B8021aeB2315E03eA1c99C2BE81baF0a2CB283', 'JK', 'J9']
-	// ,['0x139d2CE2a3f323B668E9F1f30812F762ec6AC1F0', 'AO', 'AO']
+ 	,['0x861afbf9a062d4c8b583140c1c884529ca21e503', 'JK', 'J3']
+	,['0x4263891BC4469759ac035f1f3CCEb2eD87dEaA7e', 'AK', 'AK']
+	,['0xd5c24396683c236452A898cE45A16553358A660b', 'JK', 'J4']
+	,['0xE1688450ED79aD737755965c912447DF0D933b5A', 'JB', 'JB']
+	,['0xa2F5F0d6b64Ba1acF54418FCccfB15b99ed349e7', 'Jx', 'Jx']
+	,['0x5b5af4b5ab0ed2d39ea27d93e66e3366a01d7aa9', 'JK', 'J6']
+	,['0xb351a776afbceb74d2d3747d05cf4c3b1cc539c7', 'JK', 'J7']
+	,['0x4B50bfeA9c49d01616c73Edb9C73421530FfE096', 'JK', 'J8']
+	,['0x56B8021aeB2315E03eA1c99C2BE81baF0a2CB283', 'JK', 'J9']
+	,['0x139d2CE2a3f323B668E9F1f30812F762ec6AC1F0', 'AO', 'AO']
 );
 foreach ($portfolios as &$row) {
 	$row = array_combine($keys, $row);
@@ -117,6 +127,62 @@ $fee_free = array(
 	,''
 );
 $fee_free = array_map('strtolower', $fee_free);
+
+# note suspected fee-free transactions
+$fee_free_sus = array(
+	 /* note is 'Send to kyber limit order.' */
+	 '0x51263f7bf90127d6ce97ddea54f730ae26d062ca31d1e668147fd3faf47e5312'
+	,'0xfdc70b7142c44e7a642f8c1f38b314f85ac1a540d56c7b338a8850b2da33da27'
+	,'0xbed3814644b8a2d2e1a8241e887df92da8186d0e3b9452821b619675ddf0ef13'
+	,'0x353efeaa292d7f48bfa2c95f5797152885e24e4b01c3bf5ee424befee6600376'
+	,'0xd0f949605b83b93e865b98ae722313e3a869d546c0f61416ca8a867063806a17'
+	,'0x6216ea5d793bfa2c4b1cc8afc1607c3c6d94c8ce3dc8210d58d6dee2bb2c133b'
+	,'0x09e044570edc34cab06ceab9ec2369e624cd89b8c6a8efac583f2619c5e78e22'
+	,'0xe1b84313635f1ce8bd96ac3af2983cb6dd81c09a1fc0c13230e0b6eb4fcc2bdf'
+	,'0x6d27ca72a18aa6673479933db81037cad5a47511b905f75451a6f1fce888eef1'
+	,'0x9ce5ee7390fd3c9da59456ed25ffc15b43f6442ee4fc129a7d8bd7f6b94bf8fc'
+	,'0xe3806e1ed760670d892d29a1582f014457254134ad0d2a0ed0a0db7145e9d1ea'
+	,'0x8038e485ac66b8ef6085c10090f3c28d60ea9ccda928f400b69ae8fced44951d'
+	,'0x31b88b90b910a4e519bc4f1021fe5daad48c8dd3fc67af1b8e4720ce6887571f'
+	/* note is 'Send to kyber proxy router 2.' */
+	,'0xcb44a5f1a5ac849cc3ae4e614af5549a0c53b89cc660f84531049fc308c3cebb'
+	,'0x8246c99b1afeeec245a3684c4de12e5b531b31107459a1dabf366f3596ee8eb9'
+	,'0xd7df8954017750000e44d48d710dee79b3f65702cb945d7e8c08e4a464875d0b'
+	,'0xf7f574512e8c8976e225717e714b9c076dfc631c248a3c03653572beceeadc17'
+	,'0xec30b4fba566ac1a4b8edd12ec6683d5d3c19b10e389f1923b5e464d982c82b2'
+	,'0x05657bb142791dd746a592d9fa38d0eab12adea1348bcbc3e9a9eb2f50ce9765'
+	,'0x57ea8155924f935bc1296c6831b31f2b19ccd28d859f0a0bdb313da4e1836ea1'
+	,'0x536a3060c7d162d592107925e590be3c1a01e2163c56a67ab1183d4c0366bcc2'
+	,'0xe5f4b73c5d078b42df4efe2c9bf30a51ee4367b70870d554ac0535c7d9116ece'
+	,'0x293acab4e4d28dc0391fd6c5e4b2751c93bea1276e5b9f6f6687adc7ef488215'
+	/* note is 'Transaction error, gas fee may apply. Send to token set rebalancer attempt failed.' */
+	,'0x510bef55f9d3e0535999f45472961a52c496fb9379f29f73dfa0115f7446d65c'
+	,'0x39cbfc54bd8e344d874a6f545b3068ae6cf9377708bb18851c04fc3292f214c6'
+	,'0x42f8a87250bb104696e0d5388198d7e49dd835ce2901281fa883cf060e8f2fb7'
+	,'0x8f2adcd428c96cda51070ebc39c0f09f8588321e8cb299b0c600649ef243b20c'
+	,'0x8040b735bcc2c548a324c1da55e413e45ab6fd34daaae19fb61bd0c3745eba0a'
+	,'0x2d7b03e0ad72286dc57337444223b8cdc455084b319ee0a2ab733e3f4c0b42e9'
+);
+$fee_free_sus = array_map('strtolower', $fee_free_sus);
+$fee_free = array_merge($fee_free, $fee_free_sus);
+
+# balance tiny amounts that throw out audit
+$txn_balance_dust = array(
+	[
+	'table' => 'txlist',
+	'wallet_address' => '0x7578af57e2970edb7cb065b066c488bece369c43',
+	'hash' => 'dust1',
+	'tokenSymbol' => 'ETH',
+	'tokenDecimal' => 18,
+	'contractAddress' => '0xeth',
+	'value' => 512981262955731,
+	'timeStamp' => 1589441549,
+	'tokenID' => '',
+	'from' => '', /* leave blank for deposit */
+	'to' => '0x7578af57e2970edb7cb065b066c488bece369c43',
+	'address' => ''
+	]
+);
 
 # note aidrop transactions
 $airdrops = array(
@@ -171,12 +237,16 @@ $tokens = array(
 	,['0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852', '',     'UNI-V2',     'ETH-USDT']
 	,['0x2e81ec0b8b4022fac83a21b2f2b4b8f5ed744d70', '',     'UNI-V2',     'ETH-GRT']
 	,['0x86fef14c27c78deaeb4349fd959caa11fc5b5d75', '',     'UNI-V2',     'ETH-RARI']
-	,['0x1412eca9dc7daef60451e3155bb8dbf9da349933', '',     'A68.net',    'spam']
+	,['0x1412eca9dc7daef60451e3155bb8dbf9da349933', '',     'A68.net',    'spam1']
+	,['0x6cf0b5a20b2d4b55e6b752d7016275b892035652', '',     'UniLP.net⁣',    'spam2']
+	,['0x2d262c7faa8e03a86d6634bdc6178b3e06cd690b', '',     'SDETHER.COM⁣',    'spam3']
+	,['0xdeefe7215fb3aff0b6bad252430b12be53f6f4a4', '',     'UNIV2Rewards.com',    'spam3']
 	,['0xc36442b4a4522e871399cd717abdd847ab11fe88', '4144', 'UNI-V3-POS', 'UNI-ETH-4144']
 	,['0xc36442b4a4522e871399cd717abdd847ab11fe88', '4382', 'UNI-V3-POS', 'RPL-ETH-4382']
 	,['0xc36442b4a4522e871399cd717abdd847ab11fe88', '4414', 'UNI-V3-POS', 'LYXe-ETH-4414']
 	,['0xc36442b4a4522e871399cd717abdd847ab11fe88', '4426', 'UNI-V3-POS', 'ZRX-ETH-4426']
 	,['0x9f49ed43c90a540d1cf12f6170ace8d0b88a14e6', '',     'ETHRSIAPY',  'ETHRSIAPY2']
+	,['0x39aa39c021dfbae8fac545936693ac917d5e7563', '',     'cUSDC',  'cUSDC']
 );
 foreach ($tokens as &$row) {
 	$row = array_combine($keys, $row);
@@ -188,6 +258,7 @@ unset($row);
 $keys = array('address', 'alias');
 $address_book = array(
 	['0x8139e63f2969d21883ceb278372e3fc02d152185', '? tim']
+	,['0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', 'wrapped eth']
 	,['0x744fc208bf314fdf15a88198153121d16527996a', 'bitmax wallet']
 	,['0x29bff390fc12c900aaf0f2e51c06675df691337a', 'CVP deployer']
 	,['0x0000000000000000000000000000000000000000', 'default ethereum router']
@@ -307,8 +378,9 @@ foreach ($tokens as $token) {
 		);
 }
 
+/*
 # balance history record for auditing transactions, from covalent
-
+# known bug, does not work for ETH but does for other tokens
 $config['exchange'] = 'covalent';
 
 $config = config_exchange($config);
@@ -316,7 +388,7 @@ $config = config_exchange($config);
 $address_wallet = '0x7578af57e2970EDB7cB065b066C488bEce369C43';
 $address_wallet = '0x56B8021aeB2315E03eA1c99C2BE81baF0a2CB283';
 $address_eth = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
-/*
+
 # current token balances & ETH balance
 $config['api_request'] =  '/1/' # blockchain
 		. 'address/' . $address_wallet # reference address
@@ -350,7 +422,7 @@ $config['api_request'] =  '/1/' # blockchain
 		. '&page-size=1000'
 		. '&page-number=0'
 		. '&block-signed-at-asc=true'; # sort chronologically
-*/
+
 # wallet value by eth/token over time
 $config['api_request'] =  '/1/' # blockchain
 		. 'address/' . $address_wallet # reference address
@@ -375,6 +447,7 @@ $balances = json_decode(file_get_contents('db/balance_history.json'));
 $balances = objectToArray($balances);
 
 die;
+*/
 
 # etherscan transaction query
 
@@ -392,6 +465,31 @@ $addresses = array();
 # this will be an object not array
 $contracts = json_decode(file_get_contents('db/contracts.json'));
 $contracts = objectToArray($contracts);
+
+# some contracts not captured through etherscan
+$keys = array('address', 'tokenName', 'tokenSymbol', 'symbol', 'nftTokenId', 'decimal', 'coingecko');
+$con = array(
+	  ['0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828', 'UMA', 'UMA', 'UMA', '', '18', []]
+	 ,['0xLUNA000000000000000000000000000000000000', 'LUNA', 'LUNA', 'LUNA', '', '18', []]
+	 ,['0xADA0000000000000000000000000000000000000', 'ADA', 'ADA', 'ADA', '', '18', []]
+	 ,['0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9', 'AAVE', 'AAVE', 'AAVE', '', '18', []]
+	 ,['0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2', 'MKR', 'MKR', 'MKR', '', '18', []]
+	 ,['0x4206931337dc273a630d328da6441786bfad668f', 'DOGE', 'DOGE', 'DOGE', '', '8', []]
+);
+foreach ($con as &$row) {
+	$row = array_combine($keys, $row);
+	$row['address'] = strtolower($row['address']);
+}
+unset($row);
+foreach ($con as $c) {
+	if (isset($contracts[$c['address']])) continue;
+	$contracts[$c['address']]['tokenName'] = $c['tokenName'];
+	$contracts[$c['address']]['tokenSymbol'] = $c['tokenSymbol'];
+	$contracts[$c['address']]['symbol'] = $c['symbol'];
+	$contracts[$c['address']]['nftTokenId'] = $c['nftTokenId'];
+	$contracts[$c['address']]['decimal'] = $c['decimal'];
+	$contracts[$c['address']]['coingecko'] = $c['coingecko'];
+}
 
 $keys_out = array(
 	'Type',
@@ -425,7 +523,7 @@ $keys = array_merge($keys_out, [
 ]);
 $txn_hist = json_decode(file_get_contents('db/txn_hist.json'));
 $txn_hist = objectToArray($txn_hist);
-if ($txn_hist['updated'] == $today) {
+if ($txn_hist['updated'] == $today && !$reset_txn_hist) {
 	$price_dates = $txn_hist['price_dates'];
 	$txn_hist = $txn_hist['txn_hist'];
 } else {
@@ -442,9 +540,15 @@ if ($txn_hist['updated'] == $today) {
 					. '&action=' . $table;
 			$config['url'] .= $config['api_request'];
 			$result = query_api($config);
+			$result = $result['result'];
 			sleep(0.25); # rate limit 5/second
 
-			foreach ($result['result'] as $r) {
+			# add any dust balance transactions
+			foreach ($txn_balance_dust as $r)
+				if ($table == $r['table'] && $port['address'] == $r['wallet_address']) $result[] = $r;
+
+			# now process
+			foreach ($result as $r) {
 
 				# new array
 
@@ -568,6 +672,40 @@ if ($txn_hist['updated'] == $today) {
 
 				$price_dates['0xeth'][] = $r['timeStamp'];
 
+				# special case for wrapping ETH to WETH as we won't automatically see the WETH value deposited
+				$addr_weth = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
+				if (($r['to'] == $addr_weth || $r['from'] == $addr_weth) && $r['value'] > 0 && $r['symbol'] == 'ETH') {
+
+					$row_weth = $row;
+					if ($row['Type'] == 'Withdrawal') {
+						$row_weth['Note'] = 'Wrapping ETH';
+						$row_weth['Type'] = 'Deposit';
+						$row_weth['Buy Quantity'] = $row['Sell Quantity'];
+						$row_weth['Buy Asset'] = 'WETH';
+						$row_weth['Sell Quantity'] = '';
+						$row_weth['Sell Asset'] = '';
+						$row_weth['Buy_contract_address'] = $addr_weth;
+						$row_weth['Sell_contract_address'] = '0xeth';
+					}
+					if ($row['Type'] == 'Deposit') {
+						$row_weth['Note'] = 'Unwrapping WETH';
+						$row_weth['Type'] = 'Withdrawal';
+						$row_weth['Buy Quantity'] = '';
+						$row_weth['Buy Asset'] = '';
+						$row_weth['Sell Quantity'] = $row['Buy Quantity'];
+						$row_weth['Sell Asset'] = 'WETH';
+						$row_weth['Buy_contract_address'] = '0xeth';
+						$row_weth['Sell_contract_address'] = $addr_weth;
+					}
+					$row_weth['Fee Asset'] = '';
+					$row_weth['Fee Quantity'] = '';
+					$row_weth['Fee_contract_address'] = '';
+
+					# create extra record
+					$txn_hist[] = $row_weth;
+
+				}
+
 				# record
 
 				$txn_hist[] = $row;
@@ -585,11 +723,12 @@ if ($txn_hist['updated'] == $today) {
 	$a = array('updated' => $today, 'txn_hist' => $txn_hist, 'price_dates' => $price_dates);
 	file_put_contents('db/txn_hist.json', json_encode($a));
 	unset($a);
-	file_put_contents('db/contracts.json', json_encode($contracts));
+	file_put_contents('db/contracts.json', json_encode($contracts, JSON_PRETTY_PRINT));
 }
 
-# populate transfer address info
+#var_dump($txn_hist);die;
 
+# populate transfer address info
 foreach ($txn_hist as &$row) {
 
 	foreach ($address_book as $a) {
@@ -814,89 +953,269 @@ foreach ($txn_hist as &$row) {
 }
 unset($row);
 
-# check if ETH balances matches records
+# correct zero fee transactions
 
-foreach ($portfolios as $port) {
+foreach ($txn_hist as $key => &$row) {
+	foreach ($fee_free as $txn_id) {
+		if ($row['transaction_id'] == $txn_id) {
+			if ($row['Fee Quantity'] > 0) $row['Fee Quantity'] = 0;
+			continue;
+		}
+	}
+}
+unset($row);
 
-	$config['exchange'] = 'etherscan';
-	$config = config_exchange($config);
-	$config['api_request'] = 'module=account&action=balance&tag=latest'
-			. '&apikey=' . $config['api_key']
-			. '&address=' . $port['address'];
-	$config['url'] .= $config['api_request'];
-	$result = query_api($config);
-	sleep(0.25); # rate limit 5/second
+# bring in other exchange data
 
-	$eth_balance = bcdiv($result['result'], pow(10, 18), 18);
-	$txn_fee = [];
-	$txn_fee_free = [];
-	$eth_hist = '0.000000000000000000';
-	echo $port['alias'] . PHP_EOL;
-
-	foreach ($txn_hist as $key => &$row) {
-		if ($row['Wallet'] !== $port['alias']) continue;
-		if ($row['Buy Asset'] == 'ETH') $eth_hist = bcadd($eth_hist, $row['Buy Quantity'], 18);
-		if ($row['Sell Asset'] == 'ETH') $eth_hist = bcsub($eth_hist, $row['Sell Quantity'], 18);
-		if ($row['Fee Asset'] == 'ETH') {
-
-			$known_free = FALSE;
-			foreach ($fee_free as $txn_id)
-				if ($row['transaction_id'] == $txn_id) { $known_free = TRUE; break; }
-
-			if ($known_free) {
-				$row['Fee Quantity'] = 0;
-			} else {
-				$eth_hist = bcsub($eth_hist, $row['Fee Quantity'], 18);
-				$txn_fee[$key] = (int) bcmul($row['Fee Quantity'], pow(10, 18), 0);
+$txn_dydx = json_decode(file_get_contents('db/dydx_txn_hist_tidy.json'));
+$txn_dydx = objectToArray($txn_dydx);
+# update portfolios
+$balances_dydx = json_decode(file_get_contents('db/dydx_balance.json'));
+$balances_dydx = objectToArray($balances_dydx);
+$arr = [];
+foreach ($balances_dydx as $key => $a)
+	$arr[] = $key;
+foreach ($arr as $a) {
+	foreach ($portfolios as $p) {
+		if ($p['address'] == $a) {
+			$r['address'] = $a;
+			$r['portfolio'] = $p['portfolio'];
+			$r['alias'] = $p['alias'] . 'dy';
+		}
+	}
+	$portfolios[] = $r;
+}
+# update transactions and merge
+foreach ($txn_dydx as &$txn) {
+	foreach ($portfolios as $p)
+		if ($p['address'] == $txn['wallet_address']) {
+			$txn['Wallet'] = $p['alias'];
+			$txn['portfolio'] = $p['portfolio'];
+			continue;
+		}
+}
+unset($txn);
+$txn_hist = array_merge($txn_hist, $txn_dydx);
+# dydx balances
+if ($reset_balances) {
+	$arr = $balances_dydx;
+	$balances_dydx = [];
+	foreach ($arr as $key => $a) {
+		# convert address to alias
+		foreach ($portfolios as $p)
+			if ($p['address'] == $key && substr($p['alias'], -2) == 'dy') {
+				$key = $p['alias'];
+				break;
+			}
+		# apply decimal multiplier & check is in contracts
+		foreach ($a as $k => &$v) {
+			foreach ($contracts as $ck) {
+				if ($ck['symbol'] == $k) {
+					$v = (float) $v * (int) pow(10, $ck['decimal']);
+					break;
+				}
 			}
 		}
+		unset($v);
+		$balances_dydx[$key] = $a;
 	}
-	unset($row);
-
-	echo $eth_balance . ' actual balance' . PHP_EOL;
-	echo $eth_hist . ' txn balance' . PHP_EOL;
-	echo bcsub($eth_hist, $eth_balance, 18) . ' difference' . PHP_EOL;
-	$comp = bccomp($eth_hist, $eth_balance, 18);
-	if ($comp == 0) echo 'Okay: balances equal';
-	if ($comp == 1) die('Error: txn balance higher than actual balance');
-	if ($comp == -1) echo 'txn balance lower than actual balance, checked fee-free txns ...';
-	echo PHP_EOL . PHP_EOL;
-
-	if ($comp == -1) {
-
-		echo count($txn_fee) . ' possible fee records' . PHP_EOL;
-		$target =  (int) bcmul(bcsub($eth_balance, $eth_hist, 18), pow(10, 18), 0);
-		echo 'target: ' . $target . PHP_EOL;
-
-		# get max/min num of records
-		sort($txn_fee);
-		$target_bal = $target;
-		$max = 1;
-		foreach ($txn_fee as $fee) {
-			$target_bal = $target_bal - $fee;
-			if ($target_bal < 0) break;
-			$max++;
-		}
-		rsort($txn_fee);
-		$target_bal = $target;
-		$min = 1;
-		foreach ($txn_fee as $fee) {
-			$target_bal = $target_bal - $fee;
-			if ($target_bal < 0) break;
-			$min++;
-		}
-		echo $min . ' - ' . $max . ' fee records needed';
-
-		for ($i = 0; $i < count($txn_fee); $i++) {
-
-		}
-	}
-
 }
 
-// $result = get_all_combinations($txn_fee, 2);
-// echo '('.count($result).' combination subsets found)';
-// var_dump($result);
+/*
+# functions to reconcile asset fee balances
+function sumCombinations($arr, $r, $target) {
+	# all combinations of size r in arr[], returning imploded keys and sum of vals for arr[]
+	$n = sizeof($arr);
+	$keys = array();
+	foreach ($arr as $key => $val) $keys[] = $key;
+	$combo = array();
+	$haystack = array();
+
+	$haystack = combinationUtil($arr, $keys, $combo, $target, $haystack, 0, $n - 1, 0, $r);
+	return $haystack;
+}
+function combinationUtil($arr, $keys, $combo, $target, &$haystack, $start, $end, $index, $r) {
+	# current combination is ready
+	if ($index == $r) {
+		$sum = $target;
+		foreach ($combo as $key) $sum -= $arr[$key];
+		# tolerance to < 0.01 eth	is
+		#								10000000000000000
+		if (abs($sum) < 100) {
+			#$keys = implode('|', $combo);
+			#$haystack[$keys] = $sum;
+			$a = [$combo, $sum];
+			$haystack[] = $a;
+		}
+		return $haystack;
+	}
+	// replace index with all possible elements. The condition "end-i+1 >= r-index"
+	// makes sure that including one element at index will make a combination with remaining elements at remaining positions
+	for ($i = $start; $i <= $end && $end - $i + 1 >= $r - $index; $i++) {
+		$combo[$index] = $keys[$i];
+		combinationUtil($arr, $keys, $combo, $target, $haystack, $i + 1, $end, $index + 1, $r);
+	}
+
+	return $haystack;
+}
+*/
+
+# check if asset balances match records
+
+#$string = PHP_EOL . PHP_EOL . 'audit results' . PHP_EOL . PHP_EOL;
+$string = '';
+
+if ($reset_balances) {
+	$balances = $balances_dydx;
+} else {
+	$balances = json_decode(file_get_contents('db/balances.json'));
+	$balances = objectToArray($balances);
+}
+
+if ($audit) foreach ($portfolios as $port) {
+
+	#if ($port['alias'] !== 'Jxdy') continue;
+	if (strlen($port['alias']) == 4) $dydx = TRUE;
+		else $dydx = FALSE;
+
+	# assemble asset list
+	$assets = [];
+	foreach ($txn_hist as $row) {
+		if ($row['Wallet'] !== $port['alias']) continue;
+		$arr = ['Buy Asset', 'Sell Asset', 'Fee Asset'];
+		foreach ($arr as $ass) if ($row[$ass] !== '') $assets[] = $row[$ass];
+	}
+	$assets = dedupe_array($assets);
+
+	$pass = [];
+
+	foreach ($assets as $asset) {
+
+		#if (!in_array($asset, ['ETH','USDC'])) continue;
+		if ($asset == 'ETH') {
+			$dec = 18;
+		} else {
+			$match = FALSE;
+			foreach ($contracts as $key => $c) {
+				if ($c['symbol'] == $asset) {
+					$contract = $key;
+					$dec = $c['decimal'];
+					$match = TRUE;
+					break;
+				}
+			}
+			if (!$match) {
+				$string .= $port['alias'] . ' ' . $asset . ' error: no match in contracts.json (manually audit if NFT)' . PHP_EOL . PHP_EOL;
+				continue;
+			}
+		}
+
+		if ($reset_balances && !$dydx) {
+			$config['exchange'] = 'etherscan';
+			$config = config_exchange($config);
+			$config['api_request'] = 'module=account&tag=latest'
+					. '&apikey=' . $config['api_key']
+					. '&address=' . $port['address'];
+			if ($asset == 'ETH') $config['api_request'] .= '&action=balance';
+				else $config['api_request'] .= '&action=tokenbalance&contractaddress=' . $contract;
+			$config['url'] .= $config['api_request'];
+			$result = query_api($config);
+			$balance = $result['result'];
+			$balances[$port['alias']][$asset] = $balance;
+			sleep(0.25); # rate limit 5/second
+		} else {
+			$match = FALSE;
+			foreach ($balances as $key => $arr) {
+				if ($key !== $port['alias'] || !isset($arr[$asset])) continue;
+				$balance = $arr[$asset];
+				$match = TRUE;
+				break;
+			}
+			if (!$match) {
+				$string .= $port['alias'] . ' ' . $asset . ' error: no match in balances.json' . PHP_EOL . PHP_EOL;
+				continue;
+			}
+		}
+
+#var_dump($txn_hist);die;
+		$balance = bcdiv($balance, pow(10, $dec), $dec);
+		$txn_fee = [];
+		$txn_fee_free = [];
+		$hist = '0';
+
+		foreach ($txn_hist as $key => &$row) {
+			if ($row['Wallet'] !== $port['alias']) continue;
+			if ($row['Buy Asset'] == $asset) $hist = bcadd($hist, $row['Buy Quantity'], $dec);
+			if ($row['Sell Asset'] == $asset) $hist = bcsub($hist, $row['Sell Quantity'], $dec);
+			if ($row['Fee Asset'] == $asset) $hist = bcsub($hist, $row['Fee Quantity'], $dec);
+			if ($row['Fee Quantity'] > 0)
+				$txn_fee[$key] = (int) bcmul($row['Fee Quantity'], pow(10, $dec), 0);
+		}
+		unset($row);
+
+		$diff = bcsub($hist, $balance, $dec);
+		$comp = bccomp($hist, $balance, $dec);
+		if ($comp == 0) $pass[] = $asset; # balance equal
+		if ($comp == 1) $string .= $port['alias'] . ' ' . $asset . ' error: txn balance higher than actual balance' . PHP_EOL;
+		if ($comp == -1) $string .= $port['alias'] . ' ' . $asset . ' error: txn balance lower than actual balance, checked fee-free txns ...' . PHP_EOL;
+		if ($comp == -1 || $comp == 1) {
+			$string .= $balance . ' actual balance' . PHP_EOL;
+			$string .= $hist . ' txn_hist balance' . PHP_EOL;
+			$string .= $diff . ' difference' . PHP_EOL;
+		}
+		if ($comp == 1) $string .= PHP_EOL;
+
+		if ($comp == -1) {
+
+			$string .= count($txn_fee) . ' possible fee records' . PHP_EOL;
+			$target = (int) bcmul(bcsub($balance, $hist, $dec), pow(10, $dec), 0);
+			$string .= 'target: ' . $target . PHP_EOL;
+
+			# get max/min num of records
+			$arr = [];
+			foreach ($txn_fee as $key => $val) {
+				#if (substr($val, -4) !== '0000') $arr[$key] = $val;
+				if ($val < 10000000000000000) $arr[$key] = $val;
+			}
+			asort($arr);
+			$target_bal = $target;
+			$max = 1;
+			foreach ($arr as $fee) {
+				$target_bal = $target_bal - $fee;
+				if ($target_bal < 0) break;
+				$max++;
+			}
+			$arr = array_reverse($arr, TRUE);
+			$target_bal = $target;
+			$min = 1;
+			foreach ($arr as $fee) {
+				$target_bal = $target_bal - $fee;
+				if ($target_bal < 0) break;
+				$min++;
+			}
+			$string .= 'somewhere between ' . $min . ' and ' . $max . ' fee records needed' . PHP_EOL;
+
+			// $r = $min;
+			// $arr = array_slice($arr, 0, 138, TRUE);
+			// $start = milliseconds();
+			// $haystack = sumCombinations($arr, $r, $target);
+			// $duration = (milliseconds() - $start) / 1000;
+			// echo $duration . ' seconds' . PHP_EOL;
+			// var_dump($haystack);
+			// die;
+
+			$string .= PHP_EOL;
+		}
+
+	}
+$string .= $port['alias'] . ' pass: ';
+foreach ($pass as $asset) $string .= $asset . ' ';
+$string .= PHP_EOL . PHP_EOL;
+}
+
+if ($reset_balances) file_put_contents('db/balances.json', json_encode($balances, JSON_PRETTY_PRINT));
+
+if ($audit) die($string);
 
 # populate contract address info
 
@@ -940,7 +1259,7 @@ foreach ($contracts as $address => &$c) {
 }
 unset($c);
 
-file_put_contents('db/contracts.json', json_encode($contracts));
+file_put_contents('db/contracts.json', json_encode($contracts, JSON_PRETTY_PRINT));
 
 
 # check if price record exists

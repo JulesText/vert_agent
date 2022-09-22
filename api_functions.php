@@ -46,26 +46,23 @@ function http_headers($config, $default = FALSE) {
 		switch ($config['exchange']) {
 
 			case 'dydx':
-				$config['data'] = '';
 				$config['msg'] =
-					$config['api_request'] .
-					'+' .
-					$config['method'] .
-					'+' .
 					$config['timestamp_iso8601'] .
-					'+' .
+					$config['method'] .
+					$config['api_request'] .
 					$config['data']
 				;
-				var_dump($config['msg']);
-				$config['signature'] = hmac($config['msg'], $config['secret']);
+				$config['signature'] = hmac($config['api_secret'], $config['msg']);
+				$config['signature'] = hmac($config['msg'], $config['api_secret']);
 				$httpheader = array(
-					// 'Accept: ' . $config['accept'],
-					// 'Content-Type: ' . $config['content_type'],
-					'DYDX-SIGNATURE: ' . $config['signature'],
-					'DYDX-API-KEY: ' . $config['api_key'],
-					'DYDX-TIMESTAMP: ' . $config['timestamp_iso8601'],
-					'DYDX-PASSPHRASE: ' . $config['api_passphrase']
-					//,'DYDX-ACCOUNT-NUMBER: ' . $config['account_num']
+					'Accept: ' . $config['accept']
+					,'Content-Type: ' . $config['content_type']
+					,'DYDX-TIMESTAMP: ' . $config['timestamp_iso8601']
+					,'DYDX-SIGNATURE: ' . $config['signature']
+					,'DYDX-API-KEY: ' . $config['api_key']
+					,'DYDX-PASSPHRASE: ' . $config['api_passphrase']
+					,'DYDX-ETHEREUM-ADDRESS: ' . $config['ethereumAddress']
+					,'DYDX-ACCOUNT-NUMBER: ' . $config['account_num']
 				);
 
 			break;
@@ -186,9 +183,9 @@ class APIREST {
 
 /* encrypt key */
 
-function hmac($msg, $secret) {
+function hmac($str1, $str2) {
 
-	$hmac = hash_hmac('sha256', $msg, $secret, true);
+	$hmac = hash_hmac('sha256', $str1, $str2, true);
 	$hmac = base64_encode($hmac);
 	return $hmac;
 
