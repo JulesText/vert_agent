@@ -8,7 +8,7 @@ db
 
 # installation-specific configuration
 config.php
-config.json
+config_dydx.json
 
 #
 # unwanted system files created by osx or windows

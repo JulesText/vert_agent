@@ -1,5 +1,5 @@
 # nav to dir
-# run with: python3.9 dydx.py
+# run with: python3.9 hist_dydx.py
 
 from dydx3 import Client
 from dydx3.helpers.request_helpers import json_stringify
@@ -13,7 +13,7 @@ def goto(linenum):
     global line
     line = linenum
 
-with open('config.json') as f:
+with open('config_dydx.json') as f:
     data = json.load(f)
 
 
@@ -57,7 +57,7 @@ with open('db/dydx_positions.json', 'w') as f:
     json.dump(positions, f, indent=2)
 
 
-exit()
+# exit()
 
 
 txn_hist = []
