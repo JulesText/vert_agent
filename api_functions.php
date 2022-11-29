@@ -12,6 +12,7 @@ function query_api($config, $default_headers = FALSE) {
 	if ($result['error']) {
 		$response = $config['response'];
 		$response['msg'] =
+			PHP_EOL .
 			'failed: query_api() ' . PHP_EOL .
 			'exchange: ' . $config['exchange'] . PHP_EOL .
 			'response: ' . PHP_EOL . $result['result'] . PHP_EOL .

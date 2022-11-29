@@ -149,7 +149,7 @@ $txn_balance_dust = array(
 	'tokenID' => '',
 	'from' => '', /* leave blank for deposit */
 	'to' => '0x7578af57e2970edb7cb065b066c488bece369c43',
-	'address' => ''
+	'address' => 'NA'
 	]
  ,[
 	'table' => 'txlist',
@@ -163,7 +163,7 @@ $txn_balance_dust = array(
 	'tokenID' => '',
 	'from' => '', /* leave blank for deposit */
 	'to' => '0x7578af57e2970edb7cb065b066c488bece369c43',
-	'address' => ''
+	'address' => 'NA'
 	]
 	,[
  	'table' => 'txlist',
@@ -177,7 +177,7 @@ $txn_balance_dust = array(
  	'tokenID' => '',
  	'from' => '', /* leave blank for deposit */
  	'to' => '0x4263891bc4469759ac035f1f3cceb2ed87deaa7e',
- 	'address' => ''
+ 	'address' => 'NA'
  	]
 	,[
  	'table' => 'txlist',
@@ -191,7 +191,7 @@ $txn_balance_dust = array(
  	'tokenID' => '',
  	'from' => '', /* leave blank for deposit */
  	'to' => '0xa2f5f0d6b64ba1acf54418fcccfb15b99ed349e7',
- 	'address' => ''
+ 	'address' => 'NA'
  	]
 	,[
  	'table' => 'txlist',
@@ -205,7 +205,7 @@ $txn_balance_dust = array(
  	'tokenID' => '',
  	'from' => '', /* leave blank for deposit */
  	'to' => '0x139d2ce2a3f323b668e9f1f30812f762ec6ac1f0',
- 	'address' => ''
+ 	'address' => 'NA'
  	]
 
 );
@@ -213,7 +213,6 @@ $txn_balance_dust = array(
 # note aidrop transactions
 $airdrops = array(
 	 '0xf3dd1f2b7a86efec7f910aab83718c1b49aa76160c1402404ccff37039ac1605'
-	,'0xef55c8c3d94745063eb2ebe303dd1ebea09c9f393db6c32cea2306a369587baf'
 	,'0x5714d0d1a4b0206f98ebd6c542b49c0bff2582aee077b42134d102a685769627'
 );
 $airdrops = array_map('strtolower', $airdrops);
@@ -226,149 +225,113 @@ $nftnulls = array(
 	,'0x5e35a0b6b9d20ca9b22e1768d9802f438947eedf14d662a98010f92523fe9b44' => 'ZRX-ETH-4426'
 );
 
-# if all else fails, manually specify missing price histories
-$price_manual = [
-	'ETHRSIAPY2' => ['0x9f49ed43c90a540d1cf12f6170ace8d0b88a14e6' => ['AUD' => [
-		1592991318 => ['date' => '2020-07-05 00:00:00', 'price'=>365.7769165565453, 'url'=>'https://api.coingecko.com/api/v3/coins/ethereum/contract/0x9f49ed43c90a540d1cf12f6170ace8d0b88a14e6/market_chart/range?vs_currency=aud&from=1593907200&to=1595721600'],
-		1594903561 => ['date' => '2020-07-16 13:11:07', 'price'=>340.4949081360257, 'url'=>'https://api.coingecko.com/api/v3/coins/ethereum/contract/0x9f49ed43c90a540d1cf12f6170ace8d0b88a14e6/market_chart/range?vs_currency=aud&from=1593907200&to=1595721600']
-	]]],
-	'QACOL' => ['0xdcd441ca4689bde55add971afcc2330e7ad5c90f' => ['AUD' => [
-		1598666134 => ['date' => '', 'price'=>0, 'url'=>'smart contract, no possible price value'],
-		1598878681 => ['date' => '', 'price'=>0, 'url'=>'smart contract, no possible price value']
-	]]]
-];
-
-# some tokens have ambiguous names, clarify them
-$keys = array('address', 'nftTokenId', 'tksymbol', 'symbol');
-$tokens = array(
-	 ['0xb27de0ba2abfbfdf15667a939f041b52118af5ba', '',     'UNI-V2',     'UBT-ETH']
-	,['0x3041cbd36888becc7bbcbc0045e3b1f144466f5f', '',     'UNI-V2',     'USDC-USDT']
-	,['0x3b3d4eefdc603b232907a7f3d0ed1eea5c62b5f7', '',     'UNI-V2',     'STAKE-ETH']
-	,['0x8973be4402bf0a39448f419c2d64bd3591dd2299', '',     'UNI-V2',     'YFII-ETH']
-	,['0x12d4444f96c644385d8ab355f6ddf801315b6254', '',     'UNI-V2',     'CVP-ETH']
-	,['0xed9fc98816817cf855eeed3cb2ab81887cb3fc71', '',     'UNI-V2',     'STAKE-USDT']
-	,['0xae461ca67b15dc8dc81ce7615e0320da1a9ab8d5', '',     'UNI-V2',     'DAI-USDC']
-	,['0xb20bd5d04be54f870d5c0d3ca85d82b34b836405', '',     'UNI-V2',     'DAI-USDT']
-	,['0xa2107fa5b38d9bbd2c461d6edf11b11a50f6b974', '',     'UNI-V2',     'LINK-ETH']
-	,['0xb4e16d0168e52d35cacd2c6185b44281ec28c9dc', '',     'UNI-V2',     'USDC-ETH']
-	,['0xdc7d8cc3a22fe0ec69770e02931f43451b7b975e', '',     'UNI-V2',     'EWTB-ETH']
-	,['0xbb2b8038a1640196fbe3e38816f3e67cba72d940', '',     'UNI-V2',     'WBTC-ETH']
-	,['0x966ea83cf3170a309184bb742398c925249e407e', '',     'UNI-V2',     'LPL-ETH']
-	,['0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852', '',     'UNI-V2',     'ETH-USDT']
-	,['0x2e81ec0b8b4022fac83a21b2f2b4b8f5ed744d70', '',     'UNI-V2',     'ETH-GRT']
-	,['0x86fef14c27c78deaeb4349fd959caa11fc5b5d75', '',     'UNI-V2',     'ETH-RARI']
-	,['0xc36442b4a4522e871399cd717abdd847ab11fe88', '4144', 'UNI-V3-POS', 'UNI-ETH-4144']
-	,['0xc36442b4a4522e871399cd717abdd847ab11fe88', '4382', 'UNI-V3-POS', 'RPL-ETH-4382']
-	,['0xc36442b4a4522e871399cd717abdd847ab11fe88', '4414', 'UNI-V3-POS', 'LYXe-ETH-4414']
-	,['0xc36442b4a4522e871399cd717abdd847ab11fe88', '4426', 'UNI-V3-POS', 'ZRX-ETH-4426']
-	,['0x9f49ed43c90a540d1cf12f6170ace8d0b88a14e6', '',     'ETHRSIAPY',  'ETHRSIAPY2']
-	,['0x39aa39c021dfbae8fac545936693ac917d5e7563', '',     'cUSDC',  'cUSDC']
-);
-foreach ($tokens as &$row) {
-	$row = array_combine($keys, $row);
-	$row['address'] = strtolower($row['address']);
-}
-unset($row);
-
 # note address purposes
 $keys = array('address', 'alias');
 $address_book = array(
-	['0x8139e63f2969d21883ceb278372e3fc02d152185', '? tim']
-	,['0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', 'wrapped eth']
+	['0x8139e63f2969d21883ceb278372e3fc02d152185', ' tim (?)']
+	,['0xdef1c0ded9bec7f1a1670819833240f027b25eff', '0xDefiCoded matcha exchange']
+	,['0x8463c03c0c57ff19fa8b431e0d3a34e2df89888e', '0xDefiCoded matcha exchange']
+	,['0x0000000000007f150bd6f54c40a34d7c3d5e9f56', '0xDefiCoded matcha exchange']
+	,['0x22f9dcf4647084d6c31b2765f6910cd85c178c18', '0xDefiCoded matcha exchange']
+	,['0x58e327d64fc77fa36f698989623c3e4f058c8a89', '0xDefiCoded matcha exchange']
+	,['0x06da0fd433c1a5d7a4faa01111c044910a184553', '0xDefiCoded matcha exchange']
+	,['0x0bc5ae46c32d99c434b7383183aca16dd6e9bdc8', '0xDefiCoded matcha exchange']
+	,['0xaa04f1162899554fb66d06d1d60c68d46dce4d6a', '0xDefiCoded matcha exchange']
+	,['0x0000000000a8fb09af944ab3baf7a9b3e1ab29d8', '0xDefiCoded matcha exchange']
+	,['0x397ff1542f962076d0bfe58ea045ffa2d347aca0', '0xDefiCoded matcha exchange']
+	,['0x2fa96250cf4eafe165ed7cd3f05e32a99e271566', '0xDefiCoded matcha exchange']
+	,['0x56178a0d5f301baf6cf3e1cd53d9863437345bf9', '0xDefiCoded matcha exchange']
+	,['0x8b00ee8606cc70c2dce68dea0cefe632cca0fb7b', '0xDefiCoded matcha exchange']
+	,['0x561b94454b65614ae3db0897b74303f4acf7cc75', '0xDefiCoded matcha exchange']
+	,['0x00000000000e1d0dabf7b7c7b68866fc940d0db8', '0xDefiCoded matcha exchange']
+	,['0x225a6313e0d13d0f8c87a661ddc6923b53d0509a', '0xDefiCoded matcha exchange']
+	,['0x983eb8f8c0f6902e1f078b1186500ef6602d7d54', '0xDefiCoded matcha exchange']
+	,['0x0d25efec9a4378b65dfd0457382bc2e20a864688', 'approve USDC']
+	,['0x986a2fca9eda0e06fbf7839b89bfc006ee2a23dd', 'ascendex wallet']
+	,['0x2f9ec37d6ccfff1cab21733bdadede11c823ccb0', 'bancor approval']
+	,['0x225a6313e0d13d0f8c87a661ddc6923b53d0509a', 'bancor exchange']
+	,['0x983eb8f8c0f6902e1f078b1186500ef6602d7d54', 'bancor exchange']
 	,['0x744fc208bf314fdf15a88198153121d16527996a', 'bitmax wallet']
+	,['0x79a8c46dea5ada233abaffd40f3a0a2b1e5a4f27', 'curve BUSD pool']
+	,['0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7', 'curve DAI/USDC/USDT pool']
+	,['0xfcba3e75865d2d561be8d220616520c171f12851', 'curve staking pool']
+	,['0xa90996896660decc6e997655e065b23788857849', 'curve sUSD gauge']
+	,['0xa5407eae9ba41422680e2e00537571bcc53efbfd', 'curve sUSD pool']
+	,['0xd061d61a4d941c39e5453435b6345dc261c2fce0', 'curve token minter']
 	,['0x29bff390fc12c900aaf0f2e51c06675df691337a', 'CVP deployer']
 	,['0x0000000000000000000000000000000000000000', 'default ethereum router']
+	,['0x0fd829c3365a225fb9226e75c97c3a114bd3199e', 'dydx token claims']
+	,['0x639192d54431f8c816368d3fb4107bc168d0e871', 'dydx token distributor']
+	,['0xd54f502e184b6b739d7d27a6410a67dc462d69c8', 'dydx wallet']
+	,['0x44db449cbdea5cc143f9a3f4893c171821b2d756', 'dydx wallet']
+	,['0xf42ed7184f3bdd07b0456952f67695683afd9044', 'dydx wallet']
+	,['0x8e8bd01b5a9eb272cc3892a2e40e64a716aa2a40', 'dydx wallet']
+	,['0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2', 'ETH wrapper']
 	,['0x5b67871c3a857de81a1ca0f9f7945e5670d986dc', 'ETHRSIAPY token set vault']
-	,['0x861afbf9a062d4c8b583140c1c884529ca21e503', 'hotbit wallet']
+	,['0xe334c3bba644f1e6908324728d5a6e1c5b68eed2', 'hitbtc wallet']
+	,['0x274f3c32c90517975e29dfc209a23f315c1e5fc7', 'hotbit wallet']
 	,['0x33cc2c8376c7b79224b965d544029914200932e4', 'idex wallet']
 	,['0xdbf328cc664ff89b446b1cb1c624a007ab209973', 'idex wallet']
+	,['0x65bf64ff5f51272f729bdcd7acfb00677ced86cd', 'kyber defi exchange']
+	,['0x7c66550c9c730b6fdd4c03bc2e73c5462c5f7acc', 'kyber defi exchange']
+	,['0x52d35e8f0ffa18337b093aec3dfff40445d8f4f4', 'kyber limit order']
 	,['0x818e6fecd516ecc3849daf6845e3ec868087b755', 'kyber proxy router']
 	,['0x9aab3f75489902f3a48495025729a0af77d4b11e', 'kyber proxy router 2']
 	,['0xdf4b6fb700c428476bd3c02e6fa83e110741145b', 'liquid wallet']
+	,['0x369a2020a287edfc12f39774318057073e4a40d6', 'liquid wallet']
+	,['0x61bfb5e060a3f2092ccf80ecf412980c0385d537', 'liquid wallet']
+	,['0x2f9ec37d6ccfff1cab21733bdadede11c823ccb0', 'matcha approval']
+	,['0xb3c839dbde6b96d37c56ee4f9dad3390d49310aa', 'matcha exchange']
+	,['0x881d40237659c251811cec9c364ef91dc08d300c', 'metamask exchange']
 	,['0x6cc5f688a315f3dc28a7781717a9a798a59fda7b', 'okex wallet']
+	,['0x37c8b60ec0be985cb47955a3228e4f8a8da63f92', 'okex wallet']
+	,['0x5041ed759dd4afc3a72b8192c143f72f4724081a', 'okex wallet']
+	,['0xa7efae728d2936e78bda97dc267687568dd593f3', 'okex wallet']
 	,['0x03f955ad67d0027e0baf3dccc3d1fb5f665e61f9', 'old wallet or cex/dex']
+	,['0x74de5d4fcbf63e00296fd95d33236b9794016631', 'sushiswap exchange']
 	,['0x3f5ce5fbfe3e9af3971dd833d26ba9b5c936f0be', 'swyftx wallet']
 	,['0xd551234ae421e3bcba99a0da6d736074f22192ff', 'swyftx wallet']
 	,['0x0681d8db095565fe8a346fa0277bffde9c0edbbf', 'swyftx wallet']
 	,['0x564286362092d8e7936f0549571a803b203aaced', 'swyftx wallet']
-	,['0x7a250d5630b4cf539739df2c5dacb4c659f2488d', 'uniswap router']
-	,['0xde697ac56b1bd9c0987c08911020f2341e274813', 'token set rebalancer']
 	,['0xda816e2122a8a39b0926bfa84edd3d42477e9efd', 'swyftx wallet']
-	,['0xb76c291871b92a7c9e020b2511a3402a3bf0499d', 'uniswap exchange']
-	,['0xe334c3bba644f1e6908324728d5a6e1c5b68eed2', 'hitbtc wallet']
-	,['0xda6786379ff88729264d31d472fa917f5e561443', 'token set rebalancer']
-	,['0x369a2020a287edfc12f39774318057073e4a40d6', 'liquid wallet']
-	,['0x61bfb5e060a3f2092ccf80ecf412980c0385d537', 'liquid wallet']
-	,['0x65bf64ff5f51272f729bdcd7acfb00677ced86cd', 'kyber defi exchange']
-	,['0x52d35e8f0ffa18337b093aec3dfff40445d8f4f4', 'kyber limit order']
-	,['0x37c8b60ec0be985cb47955a3228e4f8a8da63f92', 'okex wallet']
-	,['0x7c66550c9c730b6fdd4c03bc2e73c5462c5f7acc', 'kyber defi exchange']
 	,['0xe268807b0865f84b0e9aaac77328b739a0468618', 'swyftx wallet']
 	,['0x2f577f053dde1e20f9b070e313a26ea49d6c6fd6', 'swyftx wallet']
-	,['0x5041ed759dd4afc3a72b8192c143f72f4724081a', 'okex wallet']
-	,['0xa7efae728d2936e78bda97dc267687568dd593f3', 'okex wallet']
+	,['0x708396f17127c42383e3b9014072679b2f60b82f', 'swyftx wallet']
+	,['0xe0f0cfde7ee664943906f17f7f14342e76a5cec7', 'swyftx wallet']
+	,['0x9696f59e4d72e237be84ffd425dcad154bf96976', 'swyftx wallet']
+	,['0xde697ac56b1bd9c0987c08911020f2341e274813', 'token set rebalancer']
+	,['0xda6786379ff88729264d31d472fa917f5e561443', 'token set rebalancer']
+	,['0x3da1313ae46132a397d90d95b1424a9a7e3e0fce', 'uniswap CRV pool']
+	,['0xa478c2975ab1ea89e8196811f51a7b7ade33eb11', 'uniswap DAI pool']
+	,['0xb1608e16609a7ff3ac5b0da49a0539bb0c3c3d9d', 'uniswap EWTB pool']
+	,['0xb76c291871b92a7c9e020b2511a3402a3bf0499d', 'uniswap exchange']
+	,['0xd583d0824ed78767e0e35b9bf7a636c81c665aa8', 'uniswap exchange']
+	,['0x70ea56e46266f0137bac6b75710e3546f47c855d', 'uniswap exchange']
+	,['0x004375dff511095cc5a197a54140a24efef3a416', 'uniswap exchange']
+	,['0xe592427a0aece92de3edee1f18e0157c05861564', 'uniswap exchange']
+	,['0xfaace66bd25abff62718abd6db97560e414ec074', 'uniswap exchange']
+	,['0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640', 'uniswap exchange']
+	,['0x7858e59e0c01ea06df3af3d20ac7b0003275d4bf', 'uniswap exchange']
+	,['0x1d22397edfc4edf622d692050635bfc1febf1404', 'uniswap exchange']
+	,['0xa6cc3c2531fdaa6ae1a3ca84c2855806728693e8', 'uniswap LINK pool']
+	,['0x3cf3d5b9061fac75fc66bc33035803fb067cb4f8', 'uniswap match USTC exchange']
+	,['0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45', 'uniswap matcha exchange']
+	,['0x7a250d5630b4cf539739df2c5dacb4c659f2488d', 'uniswap router']
 	,['0x20312e96b1a0568ac31c6630844a962383cc66c2', 'uniswap router']
 	,['0x09363887a4096b142f3f6b58a7eed2f1a0ff7343', 'uniswap router']
 	,['0xe4b3dd9839ed1780351dc5412925cf05f07a1939', 'uniswap router']
 	,['0xeb76b50807bfe587bb3dc88c75cb351bc49e3ab3', 'uniswap router']
-	,['0x34fcb7f4edfd95761e6cbcf0fa34d19afd13089d', 'xdai distributor']
-	,['0x274f3c32c90517975e29dfc209a23f315c1e5fc7', 'hotbit wallet']
+	,['0x09cf91d5e137cf047eb9e0551ceb18239b46d3dd', 'uniswap router']
+	,['0x43ae24960e5534731fc831386c07755a2dc33d47', 'uniswap SNX pool']
 	,['0x090d4613473dee047c3f2706764f49e0821d256e', 'uniswap UNI distributor']
 	,['0xd3d2e2692501a5c9ca623199d38826e513033a17', 'uniswap UNI pool']
-	,['0xa5407eae9ba41422680e2e00537571bcc53efbfd', 'curve sUSD pool']
-	,['0xa90996896660decc6e997655e065b23788857849', 'curve sUSD gauge']
-	,['0x3da1313ae46132a397d90d95b1424a9a7e3e0fce', 'uniswap CRV pool']
-	,['0x5f3b5dfeb7b28cdbd7faba78963ee202a494e2a2', 'veCRV governance token']
-	,['0x79a8c46dea5ada233abaffd40f3a0a2b1e5a4f27', 'curve BUSD pool']
-	,['0x986a2fca9eda0e06fbf7839b89bfc006ee2a23dd', 'ascendex wallet']
-	,['0xbebc44782c7db0a1a60cb6fe97d0b483032ff1c7', 'curve DAI/USDC/USDT pool']
-	,['0x0d25efec9a4378b65dfd0457382bc2e20a864688', 'approve USDC']
-	,['0xd061d61a4d941c39e5453435b6345dc261c2fce0', 'curve token minter']
-	,['0xfcba3e75865d2d561be8d220616520c171f12851', 'curve staking pool']
-	,['0x43ae24960e5534731fc831386c07755a2dc33d47', 'uniswap SNX pool']
-	,['0x881d40237659c251811cec9c364ef91dc08d300c', 'metamask exchange']
-	,['0x74de5d4fcbf63e00296fd95d33236b9794016631', 'sushiswap exchange']
-	,['0xa478c2975ab1ea89e8196811f51a7b7ade33eb11', 'uniswap DAI pool']
-	,['0x708396f17127c42383e3b9014072679b2f60b82f', 'swyftx wallet']
-	,['0xdef1c0ded9bec7f1a1670819833240f027b25eff', '0xDefiCoded matcha exchange']
-	,['0x8463c03c0c57ff19fa8b431e0d3a34e2df89888e', '0xDefiCoded matcha exchange']
-	,['0x2f9ec37d6ccfff1cab21733bdadede11c823ccb0', 'matcha approval']
-	,['0x225a6313e0d13d0f8c87a661ddc6923b53d0509a', '0xDefiCoded matcha exchange']
-	,['0x983eb8f8c0f6902e1f078b1186500ef6602d7d54', '0xDefiCoded matcha exchange']
-	,['0x0000000000007f150bd6f54c40a34d7c3d5e9f56', '0xDefiCoded matcha exchange']
-	,['0x22f9dcf4647084d6c31b2765f6910cd85c178c18', '0xDefiCoded matcha exchange']
-	,['0x58e327d64fc77fa36f698989623c3e4f058c8a89', '0xDefiCoded matcha exchange']
-	,['0x09cf91d5e137cf047eb9e0551ceb18239b46d3dd', 'uniswap router']
-	,['0x06da0fd433c1a5d7a4faa01111c044910a184553', '0xDefiCoded matcha exchange']
-	,['0x0bc5ae46c32d99c434b7383183aca16dd6e9bdc8', '0xDefiCoded matcha exchange']
-	,['0x1d42064fc4beb5f8aaf85f4617ae8b3b5b8bd801', 'uniswap v3 UNI-ETH pool']
-	,['0x632e675672f2657f227da8d9bb3fe9177838e726', 'uniswap v3 RPL-ETH pool']
 	,['0x80c7770b4399ae22149db17e97f9fc8a10ca5100', 'uniswap v3 LYXe-ETH pool']
+	,['0x632e675672f2657f227da8d9bb3fe9177838e726', 'uniswap v3 RPL-ETH pool']
+	,['0x1d42064fc4beb5f8aaf85f4617ae8b3b5b8bd801', 'uniswap v3 UNI-ETH pool']
 	,['0x14424eeecbff345b38187d0b8b749e56faa68539', 'uniswap v3 ZRX-ETH pool']
-	,['0xd583d0824ed78767e0e35b9bf7a636c81c665aa8', 'uniswap exchange']
-	,['0x70ea56e46266f0137bac6b75710e3546f47c855d', 'uniswap exchange']
-	,['0xaa04f1162899554fb66d06d1d60c68d46dce4d6a', '0xDefiCoded matcha exchange']
-	,['0x0000000000a8fb09af944ab3baf7a9b3e1ab29d8', '0xDefiCoded matcha exchange']
-	,['0x004375dff511095cc5a197a54140a24efef3a416', 'uniswap exchange']
-	,['0x397ff1542f962076d0bfe58ea045ffa2d347aca0', '0xDefiCoded matcha exchange']
-	,['0x2fa96250cf4eafe165ed7cd3f05e32a99e271566', '0xDefiCoded matcha exchange']
-	,['0x56178a0d5f301baf6cf3e1cd53d9863437345bf9', '0xDefiCoded matcha exchange']
-	,['0xe0f0cfde7ee664943906f17f7f14342e76a5cec7', 'swyftx wallet']
-	,['0xe592427a0aece92de3edee1f18e0157c05861564', 'uniswap exchange']
-	,['0xfaace66bd25abff62718abd6db97560e414ec074', 'uniswap exchange']
-	,['0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640', 'uniswap exchange']
-	,['0xd54f502e184b6b739d7d27a6410a67dc462d69c8', 'dydx wallet']
-	,['0x44db449cbdea5cc143f9a3f4893c171821b2d756', 'dydx wallet']
-	,['0xf42ed7184f3bdd07b0456952f67695683afd9044', 'dydx wallet']
-	,['0x9696f59e4d72e237be84ffd425dcad154bf96976', 'swyftx wallet']
-	,['0x0fd829c3365a225fb9226e75c97c3a114bd3199e', 'dydx token claims']
-	,['0x639192d54431f8c816368d3fb4107bc168d0e871', 'dydx token distributor']
+	,['0x5f3b5dfeb7b28cdbd7faba78963ee202a494e2a2', 'veCRV governance token']
+	,['0x34fcb7f4edfd95761e6cbcf0fa34d19afd13089d', 'xdai distributor']
 	,['0xabea9132b05a70803a4e85094fd0e1800777fbef', 'zksync wallet']
-	,['0x7858e59e0c01ea06df3af3d20ac7b0003275d4bf', 'uniswap exchange']
-	,['0x8e8bd01b5a9eb272cc3892a2e40e64a716aa2a40', 'dydx wallet']
-	,['0x8b00ee8606cc70c2dce68dea0cefe632cca0fb7b', '0xDefiCoded matcha exchange']
-	,['0x561b94454b65614ae3db0897b74303f4acf7cc75', '0xDefiCoded matcha exchange']
-	,['0x00000000000e1d0dabf7b7c7b68866fc940d0db8', '0xDefiCoded matcha exchange']
 );
 foreach ($address_book as &$row) {
 	$row = array_combine($keys, $row);
@@ -492,6 +455,9 @@ $spam = [
 	,'0xb688d06d858e092ebb145394a1ba08c7a10e1f56'
 	,'0x54fd62228c6e1234fd5fded28555ca963dcf6d26'
 	,'0xc9da518db3abdb90a82c4d1838b7cf9b0c945e7e'
+	,'0x208a9c9d8e1d33a4f5b371bf1864aa125379ba1b'
+	,'0x70c18f2fdcb00d27494f767503874788e35c9940'
+	,'0x622651529bda465277cb890ef9176c442f42b338'
 ];
 foreach ($spam as &$row) {
 	$row = strtolower($row);
@@ -502,10 +468,8 @@ unset($row);
 $contracts_new = [];
 
 if (!$reset_txn_hist_eth) {
-	#$price_dates = $txn_hist_eth['price_dates'];
 	$txn_hist = $txn_hist_eth['txn_hist'];
 } else {
-	$price_dates = array();
 	$txn_hist = array();
 	foreach ($tables as $table) {
 
@@ -647,12 +611,9 @@ if (!$reset_txn_hist_eth) {
 						$contracts_new[$r['contractAddress']]['decimal'] = $r['decimal'];
 						$contracts_new[$r['contractAddress']]['coingecko'] = array();
 					}
-					$price_dates[$r['contractAddress']][] = $r['timeStamp'];
 				} else if ($nftnull) {
 					$row['Sell_contract_address'] = '0xnull';
 				}
-
-				$price_dates['0xeth'][] = $r['timeStamp'];
 
 				# special case for wrapping ETH to WETH as we won't automatically see the WETH value deposited
 				$addr_weth = '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2';
@@ -660,7 +621,7 @@ if (!$reset_txn_hist_eth) {
 
 					$row_weth = $row;
 					if ($row['Type'] == 'Withdrawal') {
-						$row_weth['Note'] = 'Wrapping ETH';
+						$row_weth['Note'] = 'Wrapping ETH. ';
 						$row_weth['Type'] = 'Deposit';
 						$row_weth['Buy Quantity'] = $row['Sell Quantity'];
 						$row_weth['Buy Asset'] = 'WETH';
@@ -701,8 +662,7 @@ if (!$reset_txn_hist_eth) {
 		}
 	}
 
-	$price_dates = dedupe_array($price_dates);
-	$a = array('updated' => $today, 'txn_hist' => $txn_hist, 'price_dates' => $price_dates);
+	$a = array('updated' => $today, 'txn_hist' => $txn_hist);
 	file_put_contents('db/eth_txn_hist.json', json_encode($a));
 	unset($a);
 
@@ -790,7 +750,7 @@ foreach ($txn_hist as &$row) {
 			$row['Buy Value in '.$fiat] = 0;
 		} else {
 			$row['Type'] = 'Spend';
-			$row['Sell Value in '.$fiat] = 0;
+			$row['Sell Value in '.$fiat] = '';
 		}
 		# bittytax incorrectly prices airdrops
 
@@ -900,16 +860,8 @@ foreach ($txn_hist as &$row) {
 }
 unset($row);
 
-# sort chronologically, and by tran_id/type/amount for equal times
 
-$sort_keys = array();
-foreach ($txn_hist as $row) {
-	$s = (string) $row['Timestamp'] . $row['transaction_id'];
-	if ($row['Buy Quantity'] == 0 && $row['Sell Quantity'] == 0) $s .= '0';
-	else if ($row['Buy Quantity'] == 0 && $row['Sell Quantity'] > 0) $s .= '1';
-	else if ($row['Buy Quantity'] > 0 && $row['Sell Quantity'] == 0) $s .= '2';
-	$sort_keys[] = $s;
-}
+$sort_keys = sort_txns($txn_hist);
 array_multisort($sort_keys, SORT_ASC, $txn_hist);
 
 # deduplicate fees
@@ -958,6 +910,6 @@ unset($row);
 
 # save
 
-$a = array('updated' => $txn_hist_eth['updated'], 'txn_hist' => $txn_hist, 'price_dates' => $txn_hist_eth['price_dates']);
+$a = array('updated' => $txn_hist_eth['updated'], 'txn_hist' => $txn_hist);
 file_put_contents('db/eth_txn_hist_tidy.json', json_encode($a));
 unset($a);

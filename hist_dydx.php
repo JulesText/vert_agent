@@ -72,21 +72,24 @@ $txn_manual = [
 	,'market' => 'UMA-USD'
 	,'price' => 5.4
 	,'size' => 62.5
-	,'fee' => 0.160312]
+	,'fee' => 0.160312
+	]
 	,['wallet' => '0x7578af57e2970edb7cb065b066c488bece369c43'
 	,'createdAt' => '2022-04-29T17:43:09.075Z'
 	,'side' => 'SELL'
 	,'market' => 'UMA-USD'
 	,'price' => 5.38
 	,'size' => 62.5
-	,'fee' => 0.159718]
+	,'fee' => 0.159718
+	]
 	,['wallet' => '0x7578af57e2970edb7cb065b066c488bece369c43'
 	,'createdAt' => '2022-04-29T17:43:09.075Z'
 	,'side' => 'SELL'
 	,'market' => 'UMA-USD'
 	,'price' => 5.35
 	,'size' => 62.5
-	,'fee' => 0.158828]
+	,'fee' => 0.158828
+	]
 ];
 
 # trades/fills
@@ -108,7 +111,7 @@ foreach ($txn_data as $txn) {
 
 	foreach ($pair as $asset) {
 
-		$tx = ['Type' => 'Trade', 'Buy Quantity' => '', 'Buy Asset' => '', 'Sell Quantity' => '', 'Sell Asset' => '', 'Fee Quantity' => '', 'Fee Asset' => ''];
+		$tx = ['Type' => 'Trade', 'Buy Quantity' => '', 'Buy Asset' => '', 'Sell Quantity' => '', 'Sell Asset' => '', 'Fee Quantity' => '', 'Fee Asset' => '', 'transfer_address' => 'NA'];
 
 		$tx['side'] = $t['side'];
 		if ($t['side'] == 'SELL') {
@@ -143,6 +146,16 @@ foreach ($txn_data as $txn) {
 		#$tx['Timestamp'] .= ' 23:59:59';
 		$tx['market'] = $t['market'];
 
+		# exception where fee quantity is negative due to liquidation in a volatile market
+		# counts as interest rather than fee
+		if ($tx['Fee Quantity'] < 0) {
+			# fees on dydx are only ever in USDC
+			if ($tx['Buy Asset'] == 'USDC') $tx['Buy Quantity'] -= $tx['Fee Quantity'];
+			else die('unexplained transaction');
+			$tx['Fee Quantity'] = 0;
+		}
+
+		# record
 		$txn_hist_dydx[] = $tx;
 
 		// if ($tx['wallet_address'] == '0x7578af57e2970edb7cb065b066c488bece369c43' && $tx['market'] == 'UMA-USD' && $tx['Timestamp'] == '2022-04-29')
@@ -295,6 +308,7 @@ foreach ($txn_data as $txn) {
 		$tx['Buy Asset'] = $t['creditAsset'];
 		$tx['transfer_address'] = $t['wallet'];
 		$tx['Note'] = 'Bonus offer on dydx.';
+		if ($t['transactionHash'] == '') $t['transactionHash'] = 'layer2_' . $t['fromAddress'];
 	} else die('error');
 
 	$tx['wallet_address'] = strtolower($t['wallet']);
@@ -309,36 +323,19 @@ foreach ($txn_data as $txn) {
 
 }
 
-$price_dates = array();
 $recent = 0;
 
 foreach ($txn_hist_sum as &$txn) {
 	$txn['time_unix'] = strtotime($txn['Timestamp']);
 	if ($recent < $txn['time_unix']) $recent = $txn['time_unix'];
 	$txn['error'] = '0';
-	if ($txn['Buy Asset'] !== '') $price_dates[$txn['Buy Asset']][] = $txn['time_unix'];
-	if ($txn['Sell Asset'] !== '') $price_dates[$txn['Sell Asset']][] = $txn['time_unix'];
-	if ($txn['Fee Asset'] !== '') $price_dates[$txn['Fee Asset']][] = $txn['time_unix'];
 	unset($txn['market']);
 }
 $recent = date('Y-m-d', $recent);
 
-foreach ($price_dates as $key => $a) {
-	$match = FALSE;
-	foreach ($contracts as $ckey => $c) {
-		if ($c['symbol'] == $key) {
-			$price_dates[$ckey] = dedupe_array($a);
-			$match = TRUE;
-			unset($price_dates[$key]);
-			continue;
-		}
-	}
-	if (!$match) die('fatal error: asset ' . $key . ' not found in contracts.json');
-}
-
 # save
 
-$a = array('updated' => $recent, 'txn_hist' => $txn_hist_sum, 'price_dates' => $price_dates);
+$a = array('updated' => $recent, 'txn_hist' => $txn_hist_sum);
 file_put_contents('db/dydx_txn_hist_tidy.json', json_encode($a, JSON_PRETTY_PRINT));
 unset($a);
 unset($txn_hist_sum);

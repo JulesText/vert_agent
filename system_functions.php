@@ -241,7 +241,43 @@ function convert_timestamps($config) {
 }
 
 # change object to array
+
 function objectToArray ($object) {
 	if(!is_object($object) && !is_array($object)) return $object;
 	return array_map('objectToArray', (array) $object);
+}
+
+# populate prices
+
+function fiat_value($address, $timestamp, $quantity, $fiat, $price_records) {
+
+	$result = '';
+
+	# check if price record exists
+	if (isset($price_records[$address][$fiat][$timestamp])) {
+		$price_fiat = $price_records[$address][$fiat][$timestamp]['price'];
+		$result = round($price_fiat * $quantity, 6);
+	} else {
+		die('fatal error: fiat price missing from price_records.json at ' . $timestamp . ' for ' . $address . PHP_EOL);
+	}
+
+	return $result;
+
+}
+
+# sort transaction history chronologically, and by tran_id/type/amount for equal times
+
+function sort_txns($txn_hist) {
+
+	$sort_keys = array();
+	foreach ($txn_hist as $row) {
+		$s = (string) $row['Timestamp'] . $row['transaction_id'];
+		if ($row['Buy Quantity'] == 0 && $row['Sell Quantity'] == 0) $s .= '0';
+		else if ($row['Buy Quantity'] == 0 && $row['Sell Quantity'] > 0) $s .= '1';
+		else if ($row['Buy Quantity'] > 0 && $row['Sell Quantity'] == 0) $s .= '2';
+		$sort_keys[] = $s;
+	}
+
+	return $sort_keys;
+
 }
