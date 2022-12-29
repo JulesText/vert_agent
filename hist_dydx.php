@@ -49,7 +49,7 @@ foreach ($txn_data as $txn) {
 	# long positions will show a positive value
 	# short positions will show a negative value
 	# this should reconcile with txn_hist
-	$assets[$wal][$ass] += (float) $t['size'];
+	$assets[$wal][$ass] = bcadd($assets[$wal][$ass], $t['size'], $dy_dec);
 
 }
 $txn_data = json_decode(file_get_contents('db/dydx_acc_status.json'));
@@ -117,7 +117,7 @@ foreach ($txn_data as $txn) {
 		if ($t['side'] == 'SELL') {
 			if ($asset == 'USDC') {
 				# If the Fee Asset is the same as Buy Asset, then the Buy Quantity must be the gross amount (before fee deduction), not net amount.
-				$tx['Buy Quantity'] = (float) $t['size'] * $t['price'];
+				$tx['Buy Quantity'] = (float) bcmul($t['size'], $t['price'], $dy_dec);
 				$tx['Buy Asset'] = $asset;
 				$tx['Fee Quantity'] = (float) $t['fee'];
 				$tx['Fee Asset'] = $asset;
@@ -128,7 +128,7 @@ foreach ($txn_data as $txn) {
 		} else if ($t['side'] == 'BUY') {
 			if ($asset == 'USDC') {
 				# If the Fee Asset is the same as Sell Asset, then the Sell Quantity must be the net amount (after fee deduction), not gross amount. [this is already how dydx calculates transactions]
-				$tx['Sell Quantity'] = (float) $t['size'] * $t['price'];
+				$tx['Sell Quantity'] = (float) bcmul($t['size'], $t['price'], $dy_dec);
 				$tx['Sell Asset'] = $asset;
 				$tx['Fee Quantity'] = (float) $t['fee'];
 				$tx['Fee Asset'] = $asset;
@@ -150,7 +150,7 @@ foreach ($txn_data as $txn) {
 		# counts as interest rather than fee
 		if ($tx['Fee Quantity'] < 0) {
 			# fees on dydx are only ever in USDC
-			if ($tx['Buy Asset'] == 'USDC') $tx['Buy Quantity'] -= $tx['Fee Quantity'];
+			if ($tx['Buy Asset'] == 'USDC') $tx['Buy Quantity'] = (float) bcsub($tx['Buy Quantity'], $tx['Fee Quantity'], $dy_dec);
 			else die('unexplained transaction');
 			$tx['Fee Quantity'] = 0;
 		}
@@ -250,7 +250,7 @@ foreach ($keys as $key) {
 				 # must be a match, so add
 				 foreach ($counts as $var) {
 		 			if ($txn[$var] !== '') {
-		 				$tx[$var] = (float) $tx[$var] + (float) $txn[$var];
+						$tx[$var] = (float) bcadd($tx[$var], $txn[$var], $dy_dec);
 		 			}
 		 		}
 				$i++;
@@ -261,16 +261,193 @@ foreach ($keys as $key) {
 echo $i . ' transaction and payment records calculated by day' . PHP_EOL;
 
 foreach ($txn_hist_sum as &$txn) {
-	if ($txn['Type'] == 'Trade')
-		$txn['Note'] = 'Trade on dydx.';
-	if ($txn['Type'] == 'Interest')
-		$txn['Note'] = 'Interest earned on dydx perpetual.';
-	if ($txn['Type'] == 'Spend')
-		$txn['Note'] = 'Interest paid on dydx perpetual.';
-	$txn['transaction_id'] = $txn['market'] . '_' . $txn['Timestamp'] . '_' . $txn['wallet_address'];
-	$txn['Timestamp'] .= ' 23:59:59';
+	$txn['transaction_id'] = $txn['market'] . '_' . $txn['Timestamp'] . '_' . $txn['wallet_address']; # do not change without tracing dependents
+	if ($txn['Type'] == 'Trade') {
+		$txn['Note'] = 'Trade on dydx ' . $txn['market'] . ' perpetual.';
+		if ($txn['Buy Quantity'] !== '') $txn['Timestamp'] .= ' 23:59:10'; # timestamp used for sort order later on
+		else $txn['Timestamp'] .= ' 23:59:30';
+	}
+	if ($txn['Type'] == 'Interest') {
+		$txn['Note'] = 'Interest earned on dydx ' . $txn['market'] . ' perpetual.';
+		$txn['Timestamp'] .= ' 23:59:50';
+	}
+	if ($txn['Type'] == 'Spend') {
+		$txn['Note'] = 'Interest paid on dydx ' . $txn['market'] . ' perpetual.';
+		$txn['Timestamp'] .= ' 23:59:55';
+	}
 }
 unset($txn);
+
+$sort_keys = array();
+foreach ($txn_hist_sum as $txn) $sort_keys[] = $txn['Timestamp'];
+array_multisort($sort_keys, SORT_ASC, $txn_hist_sum);
+#var_dump($txn_hist_sum);die;
+
+# get all wallet_address | market combinations
+$combos = array();
+foreach ($txn_hist_sum as $txn) $combos[] = array('wallet_address' => $txn['wallet_address'], 'market' => $txn['market']);
+$combos = dedupe_array($combos);
+# for each, iterate txn_hist and check if daily total trades in asset becomes negative
+$short_positions = [];
+
+foreach ($combos as $combo) {
+	$txn_hist_pos = [];
+	foreach ($txn_hist_sum as $txn)
+		if ($txn['Type'] == 'Trade' # check its not a fee/interest txn
+				&& $txn['wallet_address'] == $combo['wallet_address']
+				&& $txn['market'] == $combo['market'])
+			$txn_hist_pos[] = $txn;
+	$running_total = (float) 0;
+	$running_negative = (float) 0;
+	$skip_ahead = FALSE;
+
+	foreach ($txn_hist_pos as $key => $txn) {
+
+		# skip if we've already accounted for this txn
+		if ($skip_ahead) {
+			$skip_ahead = FALSE;
+			continue;
+		}
+
+		$day = substr($txn['Timestamp'], 0, 10);
+
+		# get amount
+		$amount = 0;
+		if ($txn['Buy Asset'] !== 'USDC' && $txn['Buy Quantity'] > 0) $amount = (float) $txn['Buy Quantity'];
+		if ($txn['Sell Asset'] !== 'USDC' && $txn['Sell Quantity'] > 0) $amount = (float) bcmul($txn['Sell Quantity'], -1, $dy_dec);
+		if (!$amount) continue; # not logically possible but here in case of unexpected data
+		# trade fee always in USDC, no need to check
+
+		# process amount
+		$running_total = (float) bcadd($running_total, $amount, $dy_dec);
+
+		# case 0: no open/extension of short position
+		# occurs: upon buy trade
+		if ($amount > 0 && $running_negative == 0) continue;
+
+		# case 1: open/extend a short position
+		# occurs: upon sell trade
+		# cases: 	1a open completely new short position
+		# 				1b extend existing short position
+		# conditions: side is sell
+		#							running_total < 0
+		# conditn 1a: running_negative = 0
+		# conditn 1b:	running_negative < 0
+		if ($amount < 0 && $running_total < 0) {
+			# calculate change in position
+			$diff = (float) bcsub($running_negative, $running_total, $dy_dec);
+			# distinction btw cases 1a, 1b
+			if ($running_negative == 0) $case = 'Open';
+			else $case = 'Extend';
+			# record
+			$txn_position = [];
+			foreach ($keys_txn as $k) $txn_position[$k] = '';
+			$txn_position['Type'] = 'Trade';
+			$txn_position['Buy Quantity'] = $diff;
+			$txn_position['Buy Asset'] = $txn['Sell Asset'];
+			$txn_position['Timestamp'] = $day . ' 23:59:20';
+			$txn_position['Note'] = $case . ' short position on dydx ' . $txn['market'] . ' market.';
+			$txn_position['transaction_id'] = $txn['transaction_id'];
+			$txn_position['wallet_address'] = $txn['wallet_address'];
+			$txn_position['market'] = $txn['market'];
+			$short_positions[] = $txn_position;
+			# update running negative amount (i.e. position size)
+			$running_negative = bcsub($running_negative, $diff, $dy_dec);
+		}
+
+		# case 2: close/reduce short position
+		# occurs: upon buy trade
+		# exceptions:	if next txn is sell on same day, need to account
+		# cases:	2a close position
+		#					2b reduce position
+		#					2c extend position
+		#					2d static position
+		# conditions: side is buy
+		#							running_negative < 0
+		# conditn 2a: running_negative >= 0 (after any look ahead adjustment)
+		# conditn 2b:	running_negative < 0 (after any look ahead adjustment)
+		#							$amount > look ahead amount (if exists)
+		# conditn 2c:	running_negative < 0
+		#							$amount < look ahead amount (must exist)
+		# conditn 2d: $amount = look ahead amount (must exist)
+		if ($amount > 0 && $running_negative < 0) {
+
+			# look ahead that day to check if sell trade is subsequent and process
+			# and if found to then change get amount for correct position closure/reduction, or no change
+			$ahead = 0;
+			if ($key + 1 < count($txn_hist_pos)) # check if this is last txn, then do not check for next
+				# buy/sell trades have same txn id if same day, market and wallet
+				if ($txn_hist_pos[$key+1]['transaction_id'] == $txn['transaction_id'])
+					if ($txn_hist_pos[$key+1]['Sell Asset'] !== 'USDC' && $txn_hist_pos[$key+1]['Sell Quantity'] > 0)
+						$ahead = (float) $txn_hist_pos[$key+1]['Sell Quantity'] * -1;
+
+			# no look ahead - no following txn with sell that day
+			if ($ahead == 0) {
+				# case 2a - close
+				if ($amount >= abs($running_negative)) {
+					$case = 'Close';
+					$pos_amount = (float) abs($running_negative);
+					$running_negative = 0;
+				}
+				# case 2b - reduce
+				else {
+					$case = 'Reduce';
+					$pos_amount = (float) $amount;
+					$running_negative = bcadd($running_negative, $amount, $dy_dec);
+				}
+			}
+
+			# look ahead - there is a following txn with sell that day
+			if ($ahead < 0) {
+
+				$skip_ahead = TRUE;
+				$running_total = bcadd($running_total, $ahead, $dy_dec);
+				$running_negative_ahead = (float) bcadd($running_negative, $amount, $dy_dec);
+				$running_negative_ahead = (float) bcadd($running_negative_ahead, $ahead, $dy_dec);
+
+				# case 2a - close
+				if ($running_negative_ahead >= 0) {
+					$case = 'Close';
+					$pos_amount = (float) abs(bcadd($running_negative, $ahead, $dy_dec));
+					$running_negative = 0;
+				}
+				# case 2b - reduce
+				else if ($amount > abs($ahead)) {
+					$case = 'Reduce';
+					$pos_amount = (float) abs(bcadd($amount, $ahead, $dy_dec));
+					$running_negative = $running_negative_ahead;
+				}
+				# case 2c - extend
+				else if ($amount < abs($ahead)) {
+					$case = 'Extend';
+					$pos_amount = (float) abs(bcadd($amount, $ahead, $dy_dec));
+					$running_negative = $running_negative_ahead;
+				}
+				# case 2d - static
+				else if ($amount == abs($ahead)) {
+					continue;
+				}
+				else die('look ahead error');
+
+			}
+
+			# record
+			$txn_position = [];
+			foreach ($keys_txn as $k) $txn_position[$k] = '';
+			$txn_position['Type'] = 'Trade';
+			$txn_position['Sell Quantity'] = $pos_amount;
+			$txn_position['Sell Asset'] = $txn['Buy Asset'];
+			$txn_position['Timestamp'] = $day . ' 23:59:40';
+			$txn_position['Note'] = $case . ' short position on dydx ' . $txn['market'] . ' market.';
+			$txn_position['transaction_id'] = $txn['transaction_id'];
+			$txn_position['wallet_address'] = $txn['wallet_address'];
+			$txn_position['market'] = $txn['market'];
+			$short_positions[] = $txn_position;
+		}
+	}
+}
+
+$txn_hist_sum = array_merge($txn_hist_sum, $short_positions);
 
 $txn_data = json_decode(file_get_contents('db/dydx_tran_hist.json'));
 echo count($txn_data) . ' dydx_tran_hist records read' . PHP_EOL;
@@ -290,7 +467,7 @@ foreach ($txn_data as $txn) {
 		$tx['Type'] = 'Withdrawal';
 		$tx['Sell Quantity'] = (float) $t['creditAmount'];
 		$tx['Sell Asset'] = $t['creditAsset'];
-		$tx['Fee Quantity'] = (float) $t['debitAmount'] - (float) $t['creditAmount'];
+		$tx['Fee Quantity'] = (float) bcsub($t['debitAmount'], $t['creditAmount'], $dy_dec);
 		$tx['Fee Asset'] = $t['debitAsset'];
 		$tx['transfer_address'] = $t['fromAddress'];
 		$tx['Note'] = 'Widthdrawal from dydx.';

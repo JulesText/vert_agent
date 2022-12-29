@@ -309,7 +309,7 @@ foreach ($txn_hist as &$row) {
 
 	foreach (array('Buy', 'Sell', 'Fee') as $side) {
 
-		if (in_array($row['Type'], $taxable) || $side == 'Fee') {
+		if (!$restrict_fiat_value || in_array($row['Type'], $taxable) || $side == 'Fee') {
 
 			if ($row[$side.' Value in '.$fiat] == '') {
 

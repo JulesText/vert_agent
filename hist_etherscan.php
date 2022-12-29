@@ -214,8 +214,37 @@ $txn_balance_dust = array(
 $airdrops = array(
 	 '0xf3dd1f2b7a86efec7f910aab83718c1b49aa76160c1402404ccff37039ac1605'
 	,'0x5714d0d1a4b0206f98ebd6c542b49c0bff2582aee077b42134d102a685769627'
+	,'0x2e5d24eb68ac4edcb5e39751825aa1f7868544171d2cb9b22ba5978c19925184'
+	,'0xc897ab69077a3fc4ada1b75cbdce719841bbb36dd70eb86c512a4441bcce00cc'
+	,'0x0b1c459488d42f0b062151ad88257b9bf9039c0e08f098d3224838af7c9d052d'
+	,'0xdbacb0ec89931103a6fae44aacf943ee64d90101a61416e3fe68622739ebfb0f' /* mining curve / governance  */
+	,'0xb8aa820874d05d88b7f87d5346b96537d0a339371af33ca917de375054193109' /* mining curve / governance */
 );
 $airdrops = array_map('strtolower', $airdrops);
+
+# note direct trades with individuals, not through exchange
+$manualtrades = array(
+	 '0x9faa03e14f9a201a57e12121685dda1d296a24caf2c4237e42acc35a116ba00c'
+	,'0xcc1954dcd5312388cc3384b03d034c3b15f91dd5c2d67cffbd3dcc7f179f508c'
+	,'0xa2d9cb852e74211e5b9df2a4f744c3ab08d7d6741573d272c277c1362f093d49'
+	,'0x14e7f971fcb5f4f86448a2beeb7a720f0a7ea2a159f880b7b36f99c5465b41c1'
+	,'0x5239c3c12cf5e65a3646e0c6a362dfcb9dc908206f15684d996710865b2b6d1b'
+	,'0x931378f547e34cd0338b19588d5ee1552ad6b40d75ecfe4c939d64023ada5123'
+	,'0xf9068f139bb2798411b260a73f7baee1d8133b714c12c89d1517498dad83c5c4'
+	,'0xd615c4647741ab97d94aa021d1935a9d4136e5c99f2757e300040ff02ea11c51'
+	,'0x1251e48d40dec9c498e6a04c44d92fec01103031f3a7e064eeae72ca10a5b6fd'
+	,'0x369430005c5e0a5862d5da6a1e5c06746d324b62c40422a66ed2714f8668245f'
+	,'0xaeea4f15fb7d8b9bdb64f8adfcbb624284f0c2d305670ea4cf84de50dc149486'
+	,'0x0655329cda9fb0af0af45f070bf1710c7007dde38d14673596b1a86ab0c9890f'
+);
+$manualtrades = array_map('strtolower', $manualtrades);
+
+# note personal purchase transactions, to set as spends not withdrawals
+$purchases = array(
+	 '0x5a8ef1f166a763ce995f5ac994bad6e3e3d9c1aeff654ad671559716c628aa4f'
+	,'0x47c3634486f84b27089722dc7fab9e8111e0c6a9c49663bae8b83ff8a42c4dbc'
+);
+$purchases = array_map('strtolower', $purchases);
 
 # note pooling nft disposal transactions
 $nftnulls = array(
@@ -228,7 +257,7 @@ $nftnulls = array(
 # note address purposes
 $keys = array('address', 'alias');
 $address_book = array(
-	['0x8139e63f2969d21883ceb278372e3fc02d152185', ' tim (?)']
+	['0x8139e63f2969d21883ceb278372e3fc02d152185', ' Tim']
 	,['0xdef1c0ded9bec7f1a1670819833240f027b25eff', '0xDefiCoded matcha exchange']
 	,['0x8463c03c0c57ff19fa8b431e0d3a34e2df89888e', '0xDefiCoded matcha exchange']
 	,['0x0000000000007f150bd6f54c40a34d7c3d5e9f56', '0xDefiCoded matcha exchange']
@@ -247,7 +276,7 @@ $address_book = array(
 	,['0x225a6313e0d13d0f8c87a661ddc6923b53d0509a', '0xDefiCoded matcha exchange']
 	,['0x983eb8f8c0f6902e1f078b1186500ef6602d7d54', '0xDefiCoded matcha exchange']
 	,['0x0d25efec9a4378b65dfd0457382bc2e20a864688', 'approve USDC']
-	,['0x986a2fca9eda0e06fbf7839b89bfc006ee2a23dd', 'ascendex wallet']
+	,['0x986a2fca9eda0e06fbf7839b89bfc006ee2a23dd', 'ascendex/bitmax wallet']
 	,['0x2f9ec37d6ccfff1cab21733bdadede11c823ccb0', 'bancor approval']
 	,['0x225a6313e0d13d0f8c87a661ddc6923b53d0509a', 'bancor exchange']
 	,['0x983eb8f8c0f6902e1f078b1186500ef6602d7d54', 'bancor exchange']
@@ -283,11 +312,18 @@ $address_book = array(
 	,['0x2f9ec37d6ccfff1cab21733bdadede11c823ccb0', 'matcha approval']
 	,['0xb3c839dbde6b96d37c56ee4f9dad3390d49310aa', 'matcha exchange']
 	,['0x881d40237659c251811cec9c364ef91dc08d300c', 'metamask exchange']
+	,['0x5fdaeb2280a2ed4c7776ff90cb31325cfb75bc34', 'mistaken wallet']
 	,['0x6cc5f688a315f3dc28a7781717a9a798a59fda7b', 'okex wallet']
 	,['0x37c8b60ec0be985cb47955a3228e4f8a8da63f92', 'okex wallet']
 	,['0x5041ed759dd4afc3a72b8192c143f72f4724081a', 'okex wallet']
 	,['0xa7efae728d2936e78bda97dc267687568dd593f3', 'okex wallet']
 	,['0x03f955ad67d0027e0baf3dccc3d1fb5f665e61f9', 'old wallet or cex/dex']
+	,['0x7a250d5630b4cf539739df2c5dacb4c659f2488d', 'router']
+	,['0x20312e96b1a0568ac31c6630844a962383cc66c2', 'router']
+	,['0x09363887a4096b142f3f6b58a7eed2f1a0ff7343', 'router']
+	,['0xe4b3dd9839ed1780351dc5412925cf05f07a1939', 'router']
+	,['0xeb76b50807bfe587bb3dc88c75cb351bc49e3ab3', 'router']
+	,['0x09cf91d5e137cf047eb9e0551ceb18239b46d3dd', 'router']
 	,['0x74de5d4fcbf63e00296fd95d33236b9794016631', 'sushiswap exchange']
 	,['0x3f5ce5fbfe3e9af3971dd833d26ba9b5c936f0be', 'swyftx wallet']
 	,['0xd551234ae421e3bcba99a0da6d736074f22192ff', 'swyftx wallet']
@@ -299,6 +335,9 @@ $address_book = array(
 	,['0x708396f17127c42383e3b9014072679b2f60b82f', 'swyftx wallet']
 	,['0xe0f0cfde7ee664943906f17f7f14342e76a5cec7', 'swyftx wallet']
 	,['0x9696f59e4d72e237be84ffd425dcad154bf96976', 'swyftx wallet']
+	,['0x4976a4a02f38326660d17bf34b431dc6e2eb2327', 'swyftx wallet']
+	,['0x28c6c06298d514db089934071355e5743bf21d60', 'swyftx wallet']
+	,['0x5fbaeb2280a2ed4c7776ff90cb31325cfb75bc34', 'swyftx wallet']
 	,['0xde697ac56b1bd9c0987c08911020f2341e274813', 'token set rebalancer']
 	,['0xda6786379ff88729264d31d472fa917f5e561443', 'token set rebalancer']
 	,['0x3da1313ae46132a397d90d95b1424a9a7e3e0fce', 'uniswap CRV pool']
@@ -316,12 +355,6 @@ $address_book = array(
 	,['0xa6cc3c2531fdaa6ae1a3ca84c2855806728693e8', 'uniswap LINK pool']
 	,['0x3cf3d5b9061fac75fc66bc33035803fb067cb4f8', 'uniswap match USTC exchange']
 	,['0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45', 'uniswap matcha exchange']
-	,['0x7a250d5630b4cf539739df2c5dacb4c659f2488d', 'uniswap router']
-	,['0x20312e96b1a0568ac31c6630844a962383cc66c2', 'uniswap router']
-	,['0x09363887a4096b142f3f6b58a7eed2f1a0ff7343', 'uniswap router']
-	,['0xe4b3dd9839ed1780351dc5412925cf05f07a1939', 'uniswap router']
-	,['0xeb76b50807bfe587bb3dc88c75cb351bc49e3ab3', 'uniswap router']
-	,['0x09cf91d5e137cf047eb9e0551ceb18239b46d3dd', 'uniswap router']
 	,['0x43ae24960e5534731fc831386c07755a2dc33d47', 'uniswap SNX pool']
 	,['0x090d4613473dee047c3f2706764f49e0821d256e', 'uniswap UNI distributor']
 	,['0xd3d2e2692501a5c9ca623199d38826e513033a17', 'uniswap UNI pool']
@@ -443,7 +476,8 @@ $addresses = array();
 
 # note spam contracts
 $spam = [
-	 '0x1412eca9dc7daef60451e3155bb8dbf9da349933'
+	'0xdcd441ca4689bde55add971afcc2330e7ad5c90f' /* this QACOL not really spam */
+	,'0x1412eca9dc7daef60451e3155bb8dbf9da349933'
 	,'0x6cf0b5a20b2d4b55e6b752d7016275b892035652'
 	,'0x2d262c7faa8e03a86d6634bdc6178b3e06cd690b'
 	,'0xdeefe7215fb3aff0b6bad252430b12be53f6f4a4'
@@ -458,6 +492,16 @@ $spam = [
 	,'0x208a9c9d8e1d33a4f5b371bf1864aa125379ba1b'
 	,'0x70c18f2fdcb00d27494f767503874788e35c9940'
 	,'0x622651529bda465277cb890ef9176c442f42b338'
+	,'0x0bf377fb3b5f1dd601e693b8faf6b0bd249f37d3'
+	,'0x956f824b5a37673c6fc4a6904186cb3ba499349b'
+	,'0x68ca006db91312cd60a2238ce775be5f9f738bba'
+	,'0x71b9d914eb26a2e634aff696a809988b69e1a5d1'
+	,'0xc1c8c49b0405f6cffba5351179befb2d8a2c776c'
+	,'0xa51a8578052edeb4ced5333a5e058860d9e7a35b'
+	,'0xe65af2c8be6def2a8b5fbd5b382741fac4e80fd9'
+	,'0x643695d282f6ba237afe27ffe0acd89a86b50d3e'
+	,'0xb8d566044b68b5c304f3a81c56fd2cad29c1507e'
+	,'0xe89c2dccfa045f3538ae3ebbfff3daec6a40a73a'
 ];
 foreach ($spam as &$row) {
 	$row = strtolower($row);
@@ -678,7 +722,7 @@ if (!$reset_txn_hist_eth) {
 	}
 }
 
-#var_dump($txn_hist);die;
+if ($reset_hist_die) { var_dump($txn_hist);die; }
 
 # populate transfer address info
 foreach ($txn_hist as &$row) {
@@ -737,6 +781,26 @@ foreach ($txn_hist as &$row) {
 
 	$row['type.ori'] = $row['Type'];
 
+	# Type: Trade (direct with person)
+	# treat as Trade
+	# would otherwise be incorrectly identified as deposit/withdrawal
+	# taxable event: yes
+	# identifiers: manually nominate transaction_id
+	if (in_array($row['transaction_id'], $manualtrades)) {
+		$row['Type'] = 'Trade';
+		$row['Note'] = 'Manual trade with individual. ' . $row['Note'];
+	}
+
+	# Type: Spend (personal purchase transaction)
+	# treat as Spend
+	# would otherwise be incorrectly identified as withdrawal
+	# taxable event: yes disposal
+	# identifiers: manually nominate transaction_id
+	else if (in_array($row['transaction_id'], $purchases)) {
+		$row['Type'] = 'Spend';
+		$row['Note'] = 'Personal purchase transaction. ' . $row['Note'];
+	}
+
 	# Type: Airdrop
 	# if airdrop identified but type is withdrawal, this record needs to be set as Spend type
 	# taxable event: no
@@ -744,15 +808,15 @@ foreach ($txn_hist as &$row) {
 	# manually nominate transaction_id
 	# contract_id not clearly reliable
 	# type is deposit
-	if (in_array($row['transaction_id'], $airdrops)) {
+	else if (in_array($row['transaction_id'], $airdrops)) {
 		if ($row['Type'] == 'Deposit') {
 			$row['Type'] = 'Airdrop';
-			$row['Buy Value in '.$fiat] = 0;
+			# bittytax and rp2 price airdrops, and throw error without price
+			# $row['Buy Value in '.$fiat] = 0;
 		} else {
 			$row['Type'] = 'Spend';
 			$row['Sell Value in '.$fiat] = '';
 		}
-		# bittytax incorrectly prices airdrops
 
 	}
 
@@ -773,7 +837,8 @@ foreach ($txn_hist as &$row) {
 	# one transaction_id
 	# type is deposit
 	else if ($row['t_id_sides'] == 1 && $row['Type'] == 'Deposit') {
-		$row['Buy Value in '.$fiat] = 0;
+		# bittytax and rp2 price transfers, and throw error without price
+		# $row['Buy Value in '.$fiat] = 0;
 	}
 
 	# Type: Withdrawal

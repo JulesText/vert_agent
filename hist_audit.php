@@ -101,7 +101,6 @@ if ($reset_balances) {
 
 if ($audit) foreach ($portfolios as $port) {
 
-	#if ($port['alias'] !== 'Jxdy') continue;
 	if (strlen($port['alias']) == 4) $dydx = TRUE;
 		else $dydx = FALSE;
 
@@ -135,7 +134,16 @@ if ($audit) foreach ($portfolios as $port) {
 				}
 			}
 			if (!$match) {
-				$string .= $port['alias'] . ' ' . $asset . ' error: no match in contracts.json (manually audit if NFT)' . PHP_EOL . PHP_EOL;
+				$nft = FALSE;
+				foreach ($tokens as $t)
+					if ($t['symbol'] == $asset) {
+						if ($t['nftTokenId'] !== '') {
+							$string .= 'warn:  ' . $port['alias'] . ': ' . $asset . ' no match in contracts.json (manually audit this NFT)' . PHP_EOL;
+							$nft = TRUE;
+						}
+						break;
+					}
+				if (!$nft) $string .= 'error: ' . $port['alias'] . ': ' . $asset . ' no match in contracts.json' . PHP_EOL;
 				continue;
 			}
 		}
@@ -162,7 +170,16 @@ if ($audit) foreach ($portfolios as $port) {
 				break;
 			}
 			if (!$match) {
-				$string .= $port['alias'] . ' ' . $asset . ' error: no match in balances.json' . PHP_EOL . PHP_EOL;
+				$nft = FALSE;
+				foreach ($tokens as $t)
+					if ($t['symbol'] == $asset) {
+						if ($t['nftTokenId'] !== '') {
+							$string .= 'warn:  ' . $port['alias'] . ': ' . $asset . ' no match in balances.json (manually audit this NFT)' . PHP_EOL;
+							$nft = TRUE;
+						}
+						break;
+					}
+				if (!$nft) $string .= 'error: ' . $port['alias'] . ': ' . $asset . ' no match in balances.json' . PHP_EOL;
 				continue;
 			}
 		}
@@ -187,8 +204,8 @@ if ($audit) foreach ($portfolios as $port) {
 		$comp = bccomp($hist, $balance, $dec);
 		if ($comp == 0) $pass[] = $asset; # balance equal
 		if ($comp !== 0 && $dydx && $asset == 'USDC' && $diff < 5 && $diff > -5) { $comp = 0; $pass[] = $asset . '[dust<5]'; }
-		if ($comp == 1) $string .= $port['alias'] . ' ' . $asset . ' '  . $contract . PHP_EOL . 'error: txn balance higher than actual balance' . PHP_EOL;
-		if ($comp == -1) $string .= $port['alias'] . ' ' . $asset . ' '  . $contract . PHP_EOL . 'error: txn balance lower than actual balance, checked fee-free txns ...' . PHP_EOL;
+		if ($comp == 1)  $string .= 'error: ' . $port['alias'] . ': ' . $asset . ' '  . $contract . PHP_EOL . 'error: txn balance higher than actual balance' . PHP_EOL;
+		if ($comp == -1) $string .= 'error: ' . $port['alias'] . ': ' . $asset . ' '  . $contract . PHP_EOL . 'error: txn balance lower than actual balance, checked fee-free txns ...' . PHP_EOL;
 		if ($comp == -1 || $comp == 1) {
 			$string .= $balance . ' actual balance' . PHP_EOL;
 			$string .= $hist . ' txn_hist balance' . PHP_EOL;
@@ -239,9 +256,9 @@ if ($audit) foreach ($portfolios as $port) {
 		}
 
 	}
-$string .= $port['alias'] . ' pass: ';
+$string .= 'pass:  ' . $port['alias'] . ': ';
 foreach ($pass as $asset) $string .= $asset . ' ';
-$string .= PHP_EOL . PHP_EOL;
+$string .= PHP_EOL;
 }
 
 if ($reset_balances) file_put_contents('db/balances.json', json_encode($balances, JSON_PRETTY_PRINT));

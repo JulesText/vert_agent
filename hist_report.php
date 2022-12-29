@@ -2,7 +2,7 @@
 
 include('system_includes.php');
 
-// to populate price queries, need to rerun script multiple times until die stops cease
+// to populate price queries, need to rerun script multiple times until die stops or timeouts cease
 // may need to directly edit contracts.json to work with coingecko
 // all prices from coingecko unless otherwise stated in $price_manual
 // https://www.coingecko.com/en/api/documentation
@@ -16,13 +16,16 @@ include('system_includes.php');
 # parameters
 set_time_limit(60);
 ini_set('memory_limit', '512M');
+$dy_dec = 10; # number of decimal places for dydx txn calculations
 #echo ini_get('memory_limit');die;
 $fiat = $config['base_fiat'];
-$etherscan = FALSE; # run txn processing functions
-	$reset_txn_hist_eth = FALSE; # recall transaction history
-$dydx = FALSE;
-$audit = FALSE;
-	$reset_balances = FALSE;
+$etherscan = FALSE; # run eth txn processing functions
+	$reset_txn_hist_eth = FALSE; # refresh transaction history
+	$reset_hist_die = FALSE; # show on screen refresh is complete
+$dydx = FALSE; # run dydx txn processing functions, hist_dydx.py used to generate new txn history
+$audit = FALSE; # run audit and print results, no txn file output
+	$reset_balances = FALSE; # for audit, reset wallet balances history
+$restrict_fiat_value = FALSE; # restrict fiat value calculations to taxable events (rp2/bittytax may throw error)
 $today = date('Y-m-d', $config['timestamp'] / 1000);
 
 # portfolios
@@ -34,7 +37,7 @@ $portfolios = array(
 	,['0x4263891bc4469759ac035f1f3cceb2ed87deaa7e', 'AK', 'AK'] /* trezor */
 	,['0xd5c24396683c236452a898ce45a16553358a660b', 'JK', 'J4'] /* trezor */
 	,['0xe1688450ed79ad737755965c912447df0d933b5a', 'JB', 'JB'] /* trezor */
-	,['0xa2f5f0d6b64ba1acf54418fcccfb15b99ed349e7', 'Jx', 'Jx'] /* trezor */
+	,['0xa2f5f0d6b64ba1acf54418fcccfb15b99ed349e7', 'JK', 'J5'] /* trezor */
 	,['0x5b5af4b5ab0ed2d39ea27d93e66e3366a01d7aa9', 'JK', 'J6'] /* trezor */
 	,['0xb351a776afbceb74d2d3747d05cf4c3b1cc539c7', 'JK', 'J7'] /* trezor */
 	,['0x4b50bfea9c49d01616c73edb9c73421530ffe096', 'JK', 'J8'] /* trezor */
