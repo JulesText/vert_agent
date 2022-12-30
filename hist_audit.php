@@ -211,7 +211,7 @@ if ($audit) foreach ($portfolios as $port) {
 			$string .= $hist . ' txn_hist balance' . PHP_EOL;
 			$string .= $diff . ' difference' . PHP_EOL;
 		}
-		if ($comp == 1) $string .= PHP_EOL;
+		#if ($comp == 1) $string .= PHP_EOL;
 
 		if ($comp == -1) {
 
@@ -252,13 +252,13 @@ if ($audit) foreach ($portfolios as $port) {
 			// var_dump($haystack);
 			// die;
 
-			$string .= PHP_EOL;
+			#$string .= PHP_EOL;
 		}
 
 	}
 $string .= 'pass:  ' . $port['alias'] . ': ';
 foreach ($pass as $asset) $string .= $asset . ' ';
-$string .= PHP_EOL;
+$string .= PHP_EOL . PHP_EOL;
 }
 
 if ($reset_balances) file_put_contents('db/balances.json', json_encode($balances, JSON_PRETTY_PRINT));
