@@ -1,10 +1,6 @@
 <?php
 
-# set contracts_append false by default
-# if FALSE, as new contracts identified, critical stop occurs and prints on screen
-# if seem like spam then add address to spam list
-# if not then allow, and set TRUE, then rerun to add
-$contracts_append = FALSE;
+# https://docs.etherscan.io/
 
 # data load
 $txn_hist_eth = json_decode(file_get_contents('db/eth_txn_hist.json'));
@@ -212,15 +208,20 @@ $txn_balance_dust = array(
 
 # note aidrop transactions
 $airdrops = array(
-	 '0xf3dd1f2b7a86efec7f910aab83718c1b49aa76160c1402404ccff37039ac1605'
-	,'0x5714d0d1a4b0206f98ebd6c542b49c0bff2582aee077b42134d102a685769627'
-	,'0x2e5d24eb68ac4edcb5e39751825aa1f7868544171d2cb9b22ba5978c19925184'
-	,'0xc897ab69077a3fc4ada1b75cbdce719841bbb36dd70eb86c512a4441bcce00cc'
-	,'0x0b1c459488d42f0b062151ad88257b9bf9039c0e08f098d3224838af7c9d052d'
-	,'0xdbacb0ec89931103a6fae44aacf943ee64d90101a61416e3fe68622739ebfb0f' /* mining curve / governance  */
-	,'0xb8aa820874d05d88b7f87d5346b96537d0a339371af33ca917de375054193109' /* mining curve / governance */
+	 '0xf3dd1f2b7a86efec7f910aab83718c1b49aa76160c1402404ccff37039ac1605' /* DYDX */
+	,'0x5714d0d1a4b0206f98ebd6c542b49c0bff2582aee077b42134d102a685769627' /* UNI */
 );
 $airdrops = array_map('strtolower', $airdrops);
+
+# note interest transactions
+$interests = array(
+	 '0x2e5d24eb68ac4edcb5e39751825aa1f7868544171d2cb9b22ba5978c19925184' /* CVP */
+	,'0xc897ab69077a3fc4ada1b75cbdce719841bbb36dd70eb86c512a4441bcce00cc' /* CVP */
+	,'0x0b1c459488d42f0b062151ad88257b9bf9039c0e08f098d3224838af7c9d052d' /* CVP */
+	,'0xdbacb0ec89931103a6fae44aacf943ee64d90101a61416e3fe68622739ebfb0f' /* CRV */
+	,'0xb8aa820874d05d88b7f87d5346b96537d0a339371af33ca917de375054193109' /* SNX */
+);
+$interests = array_map('strtolower', $interests);
 
 # note direct trades with individuals, not through exchange
 $manualtrades = array(
@@ -502,25 +503,63 @@ $spam = [
 	,'0x643695d282f6ba237afe27ffe0acd89a86b50d3e'
 	,'0xb8d566044b68b5c304f3a81c56fd2cad29c1507e'
 	,'0xe89c2dccfa045f3538ae3ebbfff3daec6a40a73a'
+	,'0xac5ceab2eda779f48e9c16baedf0dc44992c88aa'
+	,'0xcb6ba52f93e85b1089e2592c35696c1e7111cf85'
+	,'0xb1977364642e0dcbc17fa655a3505a3f08c382c1'
+	,'0x498b1165514f170cd1c84689a83f8ba5d5f41f11'
 ];
 foreach ($spam as &$row) {
 	$row = strtolower($row);
 }
 unset($row);
 
-# need to catch new addresses to check for spam
-$contracts_new = [];
-
 if (!$reset_txn_hist_eth) {
+
 	$txn_hist = $txn_hist_eth['txn_hist'];
+
 } else {
-	$txn_hist = array();
+
+	# build transaction history
+	# set period to query
+
+	if ($query_period == 'all') {
+
+		$txn_hist = array();
+
+		$startblock = 0;
+		$endblock = 99999999;
+
+	} else if ($query_period == 'last') {
+
+		$txn_hist = $txn_hist_eth['txn_hist'];
+
+		$last_block = 0;
+		foreach ($txn_hist as $txn) {
+			if ($txn['time_unix'] > $last_block) $last_block = $txn['time_unix'];
+		}
+		$config = config_exchange($config);
+		$config['api_request'] =  'module=block&action=getblocknobytime&closest=before'
+			. '&apikey=' . $config['api_key']
+			. '&timestamp=' . $last_block;
+		$config['url'] .= $config['api_request'];
+		$result = query_api($config);
+
+		$startblock = $result['result'] + 1;
+		$endblock = 99999999;
+
+	}
+
+	# need to catch new addresses to check for spam
+	$contracts_new = [];
+
 	foreach ($tables as $table) {
 
 		foreach ($portfolios as $port) {
 
 			$config = config_exchange($config);
-			$config['api_request'] =  'module=account&startblock=0&endblock=99999999&sort=asc'
+			$config['api_request'] =  'module=account&sort=asc'
+					. '&startblock=' . $startblock
+					. '&endblock=' . $endblock
 					. '&apikey=' . $config['api_key']
 					. '&address=' . $port['address']
 					. '&action=' . $table;
@@ -706,20 +745,21 @@ if (!$reset_txn_hist_eth) {
 		}
 	}
 
-	$a = array('updated' => $today, 'txn_hist' => $txn_hist);
-	file_put_contents('db/eth_txn_hist.json', json_encode($a));
-	unset($a);
-
 	if (count($contracts_new) > 0) {
 		if ($contracts_append) {
 			$contracts = array_merge($contracts, $contracts_new);
 			file_put_contents('db/contracts.json', json_encode($contracts, JSON_PRETTY_PRINT));
 		} else {
-			echo 'new coins, check for spam (add to $spam if necessary) then update $contracts_append' . PHP_EOL;
+			echo 'new coins, check for spam https://etherscan.io/address/0xaa (add to $spam if necessary) then update $contracts_append = TRUE' . PHP_EOL;
 			var_dump($contracts_new);
 			die;
 		}
 	}
+
+	$a = array('updated' => $today, 'txn_hist' => $txn_hist);
+	file_put_contents('db/eth_txn_hist.json', json_encode($a));
+	unset($a);
+
 }
 
 if ($reset_hist_die) { var_dump($txn_hist);die; }
@@ -812,12 +852,9 @@ foreach ($txn_hist as &$row) {
 		if ($row['Type'] == 'Deposit') {
 			$row['Type'] = 'Airdrop';
 			# bittytax and rp2 price airdrops, and throw error without price
-			# $row['Buy Value in '.$fiat] = 0;
-		} else {
-			$row['Type'] = 'Spend';
-			$row['Sell Value in '.$fiat] = '';
+			# so counterbalance transaction with minor value
+			$row['Buy Value in '.$fiat] = 1;
 		}
-
 	}
 
 	# Type: Staking, Interest, Mining, Dividend, Income
@@ -827,7 +864,15 @@ foreach ($txn_hist as &$row) {
 	# identifiers:
 	# manually nominate transaction_id
 	# type is deposit
-	else if (FALSE) {}
+	else if (in_array($row['transaction_id'], $interests)) {
+		if ($row['Type'] == 'Deposit') {
+			$row['Type'] = 'Interest';
+			$row['Note'] = ' Received as interest/staking/mining from auto distributor.';
+		} else {
+			$row['Type'] = 'Spend';
+			$row['Sell Value in '.$fiat] = '';
+		}
+	}
 
 	# Type: Deposit
 	# deposit is only for transfers between accounts I own

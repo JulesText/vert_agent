@@ -19,12 +19,17 @@ ini_set('memory_limit', '512M');
 $dy_dec = 10; # number of decimal places for dydx txn calculations
 #echo ini_get('memory_limit');die;
 $fiat = $config['base_fiat'];
-$etherscan = FALSE; # run eth txn processing functions
-	$reset_txn_hist_eth = FALSE; # refresh transaction history
-	$reset_hist_die = FALSE; # show on screen refresh is complete
+$query_period = 'last'; # 'last' to exclude previously-queried periods, or 'all' for all
 $dydx = FALSE; # run dydx txn processing functions, hist_dydx.py used to generate new txn history
 	$track = [FALSE,FALSE]; #track output on screen
 	#$track = ['0x5b5af4b5ab0ed2d39ea27d93e66e3366a01d7aa9','ETH'];
+$etherscan = TRUE; # run eth txn processing functions
+	$reset_txn_hist_eth = TRUE; # refresh transaction history
+	$reset_hist_die = TRUE; # show on screen refresh is complete
+	$contracts_append = FALSE; # set contracts_append false by default
+		# if FALSE, as new contracts identified, critical stop occurs and prints on screen
+		# if seem like spam then add address to $spam list in hist_etherscan.php
+		# if not spam then allow, and set $contracts_append = TRUE, then rerun to add contracts to db
 $audit = FALSE; # run audit and print results, no txn file output
 	$reset_balances = FALSE; # for audit, reset wallet balances history
 $restrict_fiat_value = FALSE; # restrict fiat value calculations to taxable events (rp2/bittytax may throw error)
