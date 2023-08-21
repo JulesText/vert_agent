@@ -1,5 +1,17 @@
 <?php
 
+/* heart beat counter */
+$starttime = milliseconds();
+function runtime() {
+
+	global $starttime;
+	$runtime = milliseconds() / 1000 - $starttime / 1000;
+	$runtime = sprintf('%05.1f', $runtime);
+	$runtime = $runtime . 's: ';
+	return($runtime);
+
+}
+
 /* function response handling */
 
 function process($response, $config) {
@@ -258,7 +270,10 @@ function fiat_value($address, $timestamp, $quantity, $fiat, $price_records) {
 		$price_fiat = $price_records[$address][$fiat][$timestamp]['price'];
 		$result = round($price_fiat * $quantity, 6);
 	} else {
-		die('fatal error: fiat price missing from price_records.json at ' . $timestamp . ' for ' . $address . PHP_EOL);
+		die(
+			'fatal error: fiat price missing from price_records.json at ' . $timestamp . ' for ' . $address . PHP_EOL
+			. 'try rerunning script to allow prices to update further' 
+		);
 	}
 
 	return $result;

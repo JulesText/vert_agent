@@ -130,7 +130,16 @@ for r in res:
         if not exist:
             dedupe.append(record)
     n_dupe = len(res[r]['data']) - len(dedupe)
-    print('saved', len(dedupe), r, 'records, deduped:', n_dupe)
+    # count open positions
+    i = 0
+    if r == 'positions':
+        for record in dedupe:
+            if record['status'] == "OPEN":
+                i += 1
+        posn = '... ' + str(i) + ' open positions'
+    else:
+        posn = ''
+    print('saved', len(dedupe), r, 'records, deduped:', n_dupe, posn)
     # save
     with open(res[r]['file'], 'w') as f:
         json.dump(dedupe, f, indent = 0)

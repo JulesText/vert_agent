@@ -4,34 +4,9 @@
 
 $taxable = array('Spend', 'Trade', 'Staking', 'Interest', 'Mining', 'Dividend', 'Income');
 
-# tokens that respond to coingecko queries on token id but not contract address (not ethereum)
-$tokensids = array(
-	  '0x178c820f862b14f316509ec36b13123da19a6054' => 'energy-web-token'
-	 ,'0xb4efd85c19999d84251304bda99e90b92300bd93' => 'rocket-pool'
-);
-
 # some contracts not captured through etherscan
 
-$keys = array('address', 'tokenName', 'tokenSymbol', 'symbol', 'nftTokenId', 'decimal', 'coingecko');
-$con = array(
-	  ['0x04Fa0d235C4abf4BcF4787aF4CF447DE572eF828', 'UMA', 'UMA', 'UMA', '', '18', []]
-	 ,['0x7fc66500c84a76ad7e9c93437bfc5ac33e2ddae9', 'AAVE', 'AAVE', 'AAVE', '', '18', []]
-	 ,['0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2', 'MKR', 'MKR', 'MKR', '', '18', []]
-	 ,['0x4206931337dc273a630d328da6441786bfad668f', 'DOGE', 'DOGE', 'DOGE', '', '8', []]
-	 ,['0xluna', 'LUNA', 'LUNA', 'LUNA', '', '18', []]
-	 ,['0xada', 'ADA', 'ADA', 'ADA', '', '18', []]
-	 ,['0xc36442b4a4522e871399cd717abdd847ab11fe88', 'uniswap router', 'null', 'null', '', '18', ['match' => 'pool']]
-	 ,['0xuni-eth-4144', 'UNI-ETH-4144', 'UNI-ETH-4144', 'UNI-ETH-4144', '4144', '18', ['match' => 'pool']]
-	 ,['0xrpl-eth-4382', 'RPL-ETH-4382', 'RPL-ETH-4382', 'RPL-ETH-4382', '4382', '18', ['match' => 'pool']]
-	 ,['0xlyxe-eth-4414', 'LYXe-ETH-4414', 'LYXe-ETH-4414', 'LYXe-ETH-4414', '4414', '18', ['match' => 'pool']]
-	 ,['0xzrx-eth-4426', 'ZRX-ETH-4426', 'ZRX-ETH-4426', 'ZRX-ETH-4426', '4426', '18', ['match' => 'pool']]
-);
-foreach ($con as &$row) {
-	$row = array_combine($keys, $row);
-	$row['address'] = strtolower($row['address']);
-}
-unset($row);
-foreach ($con as $c) {
+foreach ($con_not_eth as $c) {
 	if (isset($contracts[$c['address']])) continue;
 	$contracts[$c['address']]['tokenName'] = $c['tokenName'];
 	$contracts[$c['address']]['tokenSymbol'] = $c['tokenSymbol'];
@@ -56,7 +31,7 @@ foreach ($contracts as $address => &$c) {
 
 	$contract_query = TRUE;
 
-	foreach ($tokensids as $addr => $id)
+	foreach ($tokens_id_only as $addr => $id)
 		if ($addr == $address) {
 			$contract_query = FALSE;
 			$config['api_request'] = '/coins/' . $id;
@@ -96,16 +71,6 @@ $price_records = json_decode(file_get_contents('db/price_records.json'));
 $price_records = objectToArray($price_records);
 
 # in case price queries fail, manually specify missing price histories
-$price_manual = [
-	'ETHRSIAPY2' => ['0x9f49ed43c90a540d1cf12f6170ace8d0b88a14e6' => ['AUD' => [
-		1592991318 => ['date' => '2020-07-05 00:00:00', 'price'=>365.7769165565453, 'url'=>'https://api.coingecko.com/api/v3/coins/ethereum/contract/0x9f49ed43c90a540d1cf12f6170ace8d0b88a14e6/market_chart/range?vs_currency=aud&from=1593907200&to=1595721600'],
-		1594903561 => ['date' => '2020-07-16 13:11:07', 'price'=>340.4949081360257, 'url'=>'https://api.coingecko.com/api/v3/coins/ethereum/contract/0x9f49ed43c90a540d1cf12f6170ace8d0b88a14e6/market_chart/range?vs_currency=aud&from=1593907200&to=1595721600']
-	]]]
-	,'QACOL' => ['0xdcd441ca4689bde55add971afcc2330e7ad5c90f' => ['AUD' => [
-		1598666134 => ['date' => '', 'price'=>0, 'url'=>'smart contract, no possible price value'],
-		1598878681 => ['date' => '', 'price'=>0, 'url'=>'smart contract, no possible price value']
-	]]]
-];
 
 foreach ($price_manual as $s)
 	foreach ($s as $ass => $k)
@@ -116,7 +81,6 @@ foreach ($price_manual as $s)
 				'price' => $p['price'],
 				'url' => $p['url']
 			);
-
 
 # collate price dates
 
@@ -134,7 +98,7 @@ foreach ($txn_hist as $txn) {
 				}
 			}
 			if (!$match) {
-				echo 'error: asset ' . $ass . ' ' . $key . ' not found in contracts.json' . PHP_EOL;
+				echo runtime() . 'error: asset ' . $ass . ' ' . $key . ' not found in contracts.json' . PHP_EOL;
 				// var_dump($txn);
 				// die;
 			}
@@ -148,7 +112,7 @@ unset($dates);
 $i = 0;
 
 foreach ($price_dates as $ass => $tsx) $i = $i + count($tsx);
-echo $i . ' price dates' . PHP_EOL;
+echo runtime() . $i . ' price dates' . PHP_EOL;
 $i = 0;
 foreach ($price_dates as $ass => &$tsx)
 	foreach ($tsx as $k => $ts)
@@ -157,7 +121,7 @@ foreach ($price_dates as $ass => &$tsx)
 			$i++;
 		}
 unset($tsx);
-echo $i . ' price record matches' . PHP_EOL;
+echo runtime() . $i . ' price record matches' . PHP_EOL;
 
 # check if existing price history match
 # if so add to $price_records
@@ -236,7 +200,7 @@ foreach ($price_query as $address => $query) {
 
 	# contracts.json value indicates not possible to query from coingecko
 	if ($process == 'false') {
-		echo 'error: contract coingecko match (price query) is false for ' . $address . PHP_EOL;
+		echo runtime() . 'error: contract coingecko match (price query) is false for ' . $address . PHP_EOL;
 		$running = FALSE;
 		break;
 	}
@@ -263,17 +227,17 @@ foreach ($price_query as $address => $query) {
 	$cgecko++;
 	# if hit rate limit 10-50 / minute
 	if($cgecko > 20) {
-		echo 'possible rate limit reached (10-50 / minute), access blocked until next 1 minute window';
+		echo runtime() . 'possible rate limit reached (10-50 / minute), access blocked until next 1 minute window';
 		$running = FALSE;
 		break;
 	}
 	# if no result returned
 	if(!isset($result)) {
-		echo 'error: no $result for query: ' . $config['url'] . PHP_EOL;
+		echo runtime() . 'error: no $result for query: ' . $config['url'] . PHP_EOL;
 		$running = FALSE;
 		break;
 	} else {
-		echo 'ok: $result received for ' . $config['url'] . PHP_EOL;
+		echo runtime() . 'ok: $result received for ' . $config['url'] . PHP_EOL;
 	}
 
 	# process result to $price_history format

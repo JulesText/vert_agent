@@ -14,48 +14,48 @@ include('system_includes.php');
 // 	chmod 777 txn_hist.json
 
 # parameters
-set_time_limit(60);
-ini_set('memory_limit', '512M');
-$dy_dec = 10; # number of decimal places for dydx txn calculations
-#echo ini_get('memory_limit');die;
+$limittime = (int) 60; # script can use long time
+set_time_limit($limittime);
+	#echo ini_get('max_execution_time');die;
+ini_set('memory_limit', '512M'); # script can use high memory
+	#echo ini_get('memory_limit');die;
 $fiat = $config['base_fiat'];
-$query_period = 'last'; # 'last' to exclude previously-queried periods, or 'all' for all
-$dydx = FALSE; # run dydx txn processing functions, hist_dydx.py used to generate new txn history
-	$track = [FALSE,FALSE]; #track output on screen
-	#$track = ['0x5b5af4b5ab0ed2d39ea27d93e66e3366a01d7aa9','ETH'];
-$etherscan = TRUE; # run eth txn processing functions
-	$reset_txn_hist_eth = TRUE; # refresh transaction history
-	$reset_hist_die = TRUE; # show on screen refresh is complete
-	$contracts_append = FALSE; # set contracts_append false by default
-		# if FALSE, as new contracts identified, critical stop occurs and prints on screen
-		# if seem like spam then add address to $spam list in hist_etherscan.php
-		# if not spam then allow, and set $contracts_append = TRUE, then rerun to add contracts to db
-$audit = FALSE; # run audit and print results, no txn file output
-	$reset_balances = FALSE; # for audit, reset wallet balances history
-$restrict_fiat_value = FALSE; # restrict fiat value calculations to taxable events (rp2/bittytax may throw error)
-$today = date('Y-m-d', $config['timestamp'] / 1000);
+$dydx = FALSE; # hist_dydx.php to run dydx txn processing functions, hist_dydx.py used to generate:
+	# dydx_txn_hist_tidy.json
+	# dydx_balance.json
+	$dedupe_dydx = FALSE; # hist_dydx.py has its own dedupe function
+	$dy_dec = 10; # number of decimal places for dydx txn calculations
+	$track = [FALSE,FALSE]; #track output on screen, can use high memory/time
+	# $track = ['0x5b5af4b5ab0ed2d39ea27d93e66e3366a01d7aa9','ETH'];
+	$dydx_die = TRUE; # stop after running hist_dydx.php
+$etherscan = FALSE; # hist_etherscan.php to run eth txn processing functions
+	$refresh_txn_hist_eth = TRUE; # refresh transaction history, to generate:
+		# eth_txn_hist.json
+		$refresh_period = 'last'; # if refreshing, 'last' to exclude previously-queried blocks, or 'all' for rebuild
+		$refresh_wallets = ['i' => 1, 'n' => 12]; # workaround timeout limit - i) current iteration, n) max wallets per refresh
+		$contracts_append = FALSE; # set contracts_append false by default
+			# if FALSE, as new contracts identified, critical stop occurs and prints on screen
+			# if seem like spam then add address to $spam list in hist_etherscan.php
+			# if not spam then allow, and set $contracts_append = TRUE, then rerun to generate:
+			# contracts.json if any changes
+		$today = date('Y-m-d', $config['timestamp'] / 1000); # record run date
+		$refresh_hist_die = TRUE; # show on screen refresh is complete and stop further processing
+	# flow through to generate:
+	# eth_txn_hist_tidy.json
+	$eth_die = TRUE; # stop after end of running hist_etherscan.php
+$audit = FALSE; # hist_audit.php to run audit and print results
+	$reset_balances = TRUE; # for audit, re-query wallet balances to generate:
+		# balances.json
+		# balance_history.json is not operational
+	# always die() after audit to ensure correct output data file is being produced
+$secondary_process = TRUE; # hist_secondary.php to update contracts, calculate fiat prices and output data file
+	# if $*_die = FALSE & $audit = FALSE then  will flow through to generate:
+	# price_history.json
+	# price_records.json
+	$restrict_fiat_value = FALSE; # restrict fiat value calculations to taxable events (rp2/bittytax may throw error)
 
-# portfolios
-$keys = array('address', 'portfolio', 'alias');
-$portfolios = array(
-	 ['0x7578af57e2970edb7cb065b066c488bece369c43', 'JK', 'J1'] /* trezor */
-	,['0xd898f6bfbe145d84526ec25700c2c52e04a6c240', 'JK', 'J2'] /* metamask */
- 	,['0x861afbf9a062d4c8b583140c1c884529ca21e503', 'JK', 'J3'] /* metamask */
-	,['0x4263891bc4469759ac035f1f3cceb2ed87deaa7e', 'AK', 'AK'] /* trezor */
-	,['0xd5c24396683c236452a898ce45a16553358a660b', 'JK', 'J4'] /* trezor */
-	,['0xe1688450ed79ad737755965c912447df0d933b5a', 'JB', 'JB'] /* trezor */
-	,['0xa2f5f0d6b64ba1acf54418fcccfb15b99ed349e7', 'JK', 'J5'] /* trezor */
-	,['0x5b5af4b5ab0ed2d39ea27d93e66e3366a01d7aa9', 'JK', 'J6'] /* trezor */
-	,['0xb351a776afbceb74d2d3747d05cf4c3b1cc539c7', 'JK', 'J7'] /* trezor */
-	,['0x4b50bfea9c49d01616c73edb9c73421530ffe096', 'JK', 'J8'] /* trezor */
-	,['0x56b8021aeb2315e03ea1c99c2be81baf0a2cb283', 'JK', 'J9'] /* trezor */
-	,['0x139d2ce2a3f323b668e9f1f30812f762ec6ac1f0', 'AO', 'AO'] /* trezor */
-);
-foreach ($portfolios as &$row) {
-	$row = array_combine($keys, $row);
-	$row['address'] = strtolower($row['address']);
-}
-unset($row); # unset &$row as still accessible
+# portfolios and idiosyncratic records
+require('hist_idio.php');
 
 # contracts
 $contracts = json_decode(file_get_contents('db/contracts.json'));
@@ -87,6 +87,7 @@ $keys_txn = array_merge($keys_out, [
 	'Buy_contract_address',
 	'Sell_contract_address',
 	'Fee_contract_address',
+	'block',
 	'error',
 	'type.ori',
 	't_id_sides',
@@ -97,7 +98,6 @@ $keys_txn = array_merge($keys_out, [
 if ($dydx) require('hist_dydx.php');
 
 # etherscan
-require('hist_etherscan_idio.php');
 if ($etherscan) require('hist_etherscan.php');
 
 # bring in exchange data
@@ -157,8 +157,10 @@ $txn_hist = array_merge($txn_eth, $txn_dydx);
 $sort_keys = sort_txns($txn_hist);
 array_multisort($sort_keys, SORT_ASC, $txn_hist);
 
+echo runtime() . 'bring in all data' . PHP_EOL;
+
 # audit report
-if ($audit || $reset_balances) require('hist_audit.php');
+if ($audit) require('hist_audit.php');
 
 # update contracts, calculate fiat prices and output data file
 require('hist_secondary.php');

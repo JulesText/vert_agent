@@ -28,9 +28,11 @@ $contracts = objectToArray($contracts);
 
 # open positions
 $txn_data = json_decode(file_get_contents('db/dydx_positions.json'));
-echo count($txn_data) . ' dydx_positions records read' . PHP_EOL;
-$txn_data = dedupe_array($txn_data);
-echo count($txn_data) . ' dydx_positions records after dedupe' . PHP_EOL;
+echo runtime() . count($txn_data) . ' dydx_positions records read' . PHP_EOL;
+if ($dedupe_dydx) {
+	$txn_data = dedupe_array($txn_data);
+	echo count($txn_data) . ' dydx_positions records after dedupe' . PHP_EOL;
+}
 $assets = [];
 foreach ($txn_data as $txn) {
 
@@ -97,9 +99,11 @@ $txn_manual = [
 #$test = [];
 $txn_data = json_decode(file_get_contents('db/dydx_txn_hist.json'));
 $txn_data = array_merge($txn_manual, $txn_data);
-echo count($txn_data) . ' dydx_txn_hist records read' . PHP_EOL;
-$txn_data = dedupe_array($txn_data);
-echo count($txn_data) . ' dydx_txn_hist records after dedupe' . PHP_EOL;
+echo runtime() . count($txn_data) . ' dydx_txn_hist records read' . PHP_EOL;
+if ($dedupe_dydx) {
+	$txn_data = dedupe_array($txn_data);
+	echo count($txn_data) . ' dydx_txn_hist records after dedupe' . PHP_EOL;
+}
 foreach ($txn_data as $txn) {
 
 	$t = [];
@@ -177,12 +181,14 @@ foreach ($txn_data as $txn) {
 
 $txn_data = json_decode(file_get_contents('db/dydx_pay_hist.json'));
 $txn_data = json_decode(json_encode($txn_data), true);
-echo count($txn_data) . ' dydx_pay_hist records read' . PHP_EOL;
+echo runtime() . count($txn_data) . ' dydx_pay_hist records read' . PHP_EOL;
 $keys = ['rate', 'positionSize', 'price'];
 foreach ($txn_data as &$row) foreach ($keys as $key) unset($row[$key]);
 unset($row);
-$txn_data = dedupe_array($txn_data);
-echo count($txn_data) . ' dydx_pay_hist records after dedupe' . PHP_EOL;
+if ($dedupe_dydx) {
+	$txn_data = dedupe_array($txn_data);
+	echo count($txn_data) . ' dydx_pay_hist records after dedupe' . PHP_EOL;
+}
 foreach ($txn_data as $txn) {
 
 	$t = [];
@@ -231,9 +237,9 @@ foreach ($txn_hist_dydx as $txn) {
 		// ,'transaction_id' => $txn['transaction_id']
 	];
 }
-echo count($keys) . ' transaction and payment records read' . PHP_EOL;
-$keys = dedupe_array($keys); # can use high memory, use ini_set('memory_limit') in parameters above
-echo 'expect ' . count($keys) . ' transaction and payment records once merged by day' . PHP_EOL;
+echo runtime() . count($keys) . ' transaction and payment records read' . PHP_EOL;
+$keys = dedupe_array($keys); # must be deduped, can use high memory, use ini_set('memory_limit') in parameters above
+echo runtime() . 'expect ' . count($keys) . ' transaction and payment records once merged by day' . PHP_EOL;
 
 $i = 0;
 $txn_hist_sum = [];
@@ -252,7 +258,7 @@ foreach ($keys as $key) {
 			&& $txn['market'] == $key['market']
 		 ) {
 				 # must be a match, so add
-				 foreach ($counts as $var) {
+				foreach ($counts as $var) {
 		 			if ($txn[$var] !== '') {
 						$tx[$var] = (float) bcadd($tx[$var], $txn[$var], $dy_dec);
 		 			}
@@ -262,7 +268,8 @@ foreach ($keys as $key) {
 	}
 	$txn_hist_sum[] = $tx;
 }
-echo $i . ' transaction and payment records calculated by day' . PHP_EOL;
+echo runtime() . $i . ' transaction and payment records processed by day' . PHP_EOL;
+echo runtime() . 'result ' . count($txn_hist_sum) . ' transaction and payment records once merged by day' . PHP_EOL;
 
 foreach ($txn_hist_sum as &$txn) {
 	$txn['transaction_id'] = $txn['market'] . '_' . $txn['Timestamp'] . '_' . $txn['wallet_address']; # do not change without tracing dependents
@@ -284,9 +291,11 @@ foreach ($txn_hist_sum as &$txn) {
 unset($txn);
 
 $txn_data = json_decode(file_get_contents('db/dydx_tran_hist.json'));
-echo count($txn_data) . ' dydx_tran_hist records read' . PHP_EOL;
-$txn_data = dedupe_array($txn_data);
-echo count($txn_data) . ' dydx_tran_hist records after dedupe' . PHP_EOL;
+echo runtime() . count($txn_data) . ' dydx_tran_hist records read' . PHP_EOL;
+if ($dedupe_dydx) {
+	$txn_data = dedupe_array($txn_data);
+	echo count($txn_data) . ' dydx_tran_hist records after dedupe' . PHP_EOL;
+}
 foreach ($txn_data as $txn) {
 
 	$t = [];
@@ -397,7 +406,7 @@ foreach ($combos as $combo) {
 
 		# track
 		if ($track[0] == $txn['wallet_address'] && $track[1] == $asset)
-			echo $asset . ' $day ' . $day . ' $running_negative ' . $running_negative . ' $running_total ' . $running_total . PHP_EOL;
+			echo runtime() . $asset . ' $day ' . $day . ' $running_negative ' . $running_negative . ' $running_total ' . $running_total . PHP_EOL;
 
 		# process amount
 		$running_total = (float) bcadd($running_total, $amount, $dy_dec);
@@ -579,4 +588,5 @@ unset($a);
 unset($txn_hist_sum);
 unset($txn_data);
 
-echo 'dydx calcs complete' . PHP_EOL . PHP_EOL;
+echo runtime() . 'dydx calcs complete' . PHP_EOL . PHP_EOL;
+if ($dydx_die) die;

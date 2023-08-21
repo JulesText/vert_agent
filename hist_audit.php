@@ -13,11 +13,6 @@ array_multisort($sort_keys, SORT_ASC, $txn_hist);
 # dydx balances
 if ($reset_balances) {
 
-	$balances_manual = [
-		'J1dy' => ['LUNA' => 0]
-		,'J6dy' => ['LUNA' => 0]
-	];
-
 	$arr = $balances_dydx;
 	$balances_dydx = [];
 
@@ -41,7 +36,7 @@ if ($reset_balances) {
 		$balances_dydx[$key] = $a;
 	}
 
-	foreach ($balances_manual as $addr => $arr)
+	foreach ($balances_manual_dydx as $addr => $arr)
 		foreach ($arr as $k => $v)
 			if (!isset($balances_dydx[$addr][$key]))
 				$balances_dydx[$addr][$k] = (float) $v;
@@ -90,7 +85,7 @@ function combinationUtil($arr, $keys, $combo, $target, &$haystack, $start, $end,
 # check if asset balances match records
 
 #$string = PHP_EOL . PHP_EOL . 'audit results' . PHP_EOL . PHP_EOL;
-$string = '';
+$string = runtime() . 'prepared audit data' . PHP_EOL . PHP_EOL;
 
 if ($reset_balances) {
 	$balances = $balances_dydx;
@@ -103,6 +98,8 @@ if ($audit) foreach ($portfolios as $port) {
 
 	if (strlen($port['alias']) == 4) $dydx = TRUE;
 		else $dydx = FALSE;
+
+	if ($reset_balances) $string .= runtime() . 'querying balances for ' . $port['alias'] . PHP_EOL;
 
 	# assemble asset list
 	$assets = [];
@@ -123,6 +120,7 @@ if ($audit) foreach ($portfolios as $port) {
 		#if (!in_array($asset, ['ETH','USDC'])) continue;
 		if ($asset == 'ETH') {
 			$dec = 18;
+			$contract = '0xeth';
 		} else {
 			$match = FALSE;
 			foreach ($contracts as $key => $c) {
@@ -138,12 +136,12 @@ if ($audit) foreach ($portfolios as $port) {
 				foreach ($tokens as $t)
 					if ($t['symbol'] == $asset) {
 						if ($t['nftTokenId'] !== '') {
-							$string .= 'warn:  ' . $port['alias'] . ': ' . $asset . ' no match in contracts.json (manually audit this NFT)' . PHP_EOL;
+							$string .= PHP_EOL . 'warn:  ' . $port['alias'] . ': ' . $asset . ' no match in contracts.json (manually audit this NFT)' . PHP_EOL;
 							$nft = TRUE;
 						}
 						break;
 					}
-				if (!$nft) $string .= 'error: ' . $port['alias'] . ': ' . $asset . ' no match in contracts.json' . PHP_EOL;
+				if (!$nft) $string .= PHP_EOL . 'error: ' . $port['alias'] . ': ' . $asset . ' no match in contracts.json' . PHP_EOL;
 				continue;
 			}
 		}
@@ -184,7 +182,6 @@ if ($audit) foreach ($portfolios as $port) {
 			}
 		}
 
-#var_dump($txn_hist);die;
 		$balance = bcdiv($balance, pow(10, $dec), $dec);
 		$txn_fee = [];
 		$txn_fee_free = [];
@@ -195,68 +192,66 @@ if ($audit) foreach ($portfolios as $port) {
 			if ($row['Buy Asset'] == $asset) $hist = bcadd($hist, $row['Buy Quantity'], $dec);
 			if ($row['Sell Asset'] == $asset) $hist = bcsub($hist, $row['Sell Quantity'], $dec);
 			if ($row['Fee Asset'] == $asset) $hist = bcsub($hist, $row['Fee Quantity'], $dec);
-			if ($row['Fee Quantity'] > 0)
-				$txn_fee[$key] = (int) bcmul($row['Fee Quantity'], pow(10, $dec), 0);
+			if ($row['Fee Quantity'] > 0) $txn_fee[$key] = (int) bcmul($row['Fee Quantity'], pow(10, $dec), 0);
 		}
+		# too difficult to get accurate match of block / date, so just take last txn date
+		$time_unix = $row['time_unix'];
+		$block = $row['block'];
 		unset($row);
 
 		$diff = bcsub($hist, $balance, $dec);
 		$comp = bccomp($hist, $balance, $dec);
 		if ($comp == 0) $pass[] = $asset; # balance equal
 		if ($comp !== 0 && $dydx && $asset == 'USDC' && $diff < 5 && $diff > -5) { $comp = 0; $pass[] = $asset . '[dust<5]'; }
-		if ($comp == 1)  $string .= 'error: ' . $port['alias'] . ': ' . $asset . ' '  . $contract . PHP_EOL . 'error: txn balance higher than actual balance' . PHP_EOL;
-		if ($comp == -1) $string .= 'error: ' . $port['alias'] . ': ' . $asset . ' '  . $contract . PHP_EOL . 'error: txn balance lower than actual balance, checked fee-free txns ...' . PHP_EOL;
+		if ($comp == 1)  $string .= PHP_EOL . 'error: ' . $port['alias'] . ': ' . $asset . ' '  . $contract . PHP_EOL . 'error: txn balance higher than actual balance' . PHP_EOL;
+		if ($comp == -1) $string .= PHP_EOL . 'error: ' . $port['alias'] . ': ' . $asset . ' '  . $contract . PHP_EOL . 'error: txn balance lower than actual balance, checked fee-free txns ...' . PHP_EOL;
 		if ($comp == -1 || $comp == 1) {
 			$string .= $balance . ' actual balance' . PHP_EOL;
 			$string .= $hist . ' txn_hist balance' . PHP_EOL;
 			$string .= $diff . ' difference' . PHP_EOL;
-		}
-		#if ($comp == 1) $string .= PHP_EOL;
-
-		if ($comp == -1) {
-
-			$string .= count($txn_fee) . ' possible fee records' . PHP_EOL;
 			$target = (int) bcmul(bcsub($balance, $hist, $dec), pow(10, $dec), 0);
 			$string .= 'target: ' . $target . PHP_EOL;
-
-			# get max/min num of records
-			$arr = [];
-			foreach ($txn_fee as $key => $val) {
-				#if (substr($val, -4) !== '0000') $arr[$key] = $val;
-				if ($val < 10000000000000000) $arr[$key] = $val;
+			if ($diff > 0) {
+				$from = $port['address'];
+				$to = ''; # leave blank for withdrawal
+			} else {
+				$from = ''; # leave blank for deposit
+				$to = $port['address'];
 			}
-			asort($arr);
-			$target_bal = $target;
-			$max = 1;
-			foreach ($arr as $fee) {
-				$target_bal = $target_bal - $fee;
-				if ($target_bal < 0) break;
-				$max++;
+			$dust = FALSE;
+			$i = 0;
+			while (!$dust) {
+				$i++;
+				$hash = 'dust' . $i;
+				$match_dust = FALSE;
+				foreach ($txn_balance_dust as $txn_dust)
+					if ($txn_dust['hash'] == $hash) $match_dust = TRUE;
+				if (!$match_dust) $dust = TRUE;
 			}
-			$arr = array_reverse($arr, TRUE);
-			$target_bal = $target;
-			$min = 1;
-			foreach ($arr as $fee) {
-				$target_bal = $target_bal - $fee;
-				if ($target_bal < 0) break;
-				$min++;
-			}
-			$string .= 'somewhere between ' . $min . ' and ' . $max . ' fee records needed' . PHP_EOL;
 
-			// $r = $min;
-			// $arr = array_slice($arr, 0, 138, TRUE);
-			// $start = milliseconds();
-			// $haystack = sumCombinations($arr, $r, $target);
-			// $duration = (milliseconds() - $start) / 1000;
-			// echo $duration . ' seconds' . PHP_EOL;
-			// var_dump($haystack);
-			// die;
+			$string .= "
+may be preferable to balance dust in txn_balance_dust then rerun etherscan query
+,[
+'blockNumber' => " . $block . ",
+'table' => 'txlist',
+'wallet_address' => '" . $port['address'] . "',
+'hash' => '" . $hash . "',
+'tokenSymbol' => '" . $asset . "',
+'tokenDecimal' => " . $dec . ",
+'contractAddress' => '" . $contract . "',
+'value' => " . abs($target) . ",
+'timeStamp' => " . $time_unix . ",
+'tokenID' => '',
+'from' => '" . $from . "',
+'to' => '" . $to . "',
+'address' => 'NA'
+]
+			" . PHP_EOL;
 
-			#$string .= PHP_EOL;
 		}
 
 	}
-$string .= 'pass:  ' . $port['alias'] . ': ';
+$string .= runtime() . 'pass:  ' . $port['alias'] . ': ';
 foreach ($pass as $asset) $string .= $asset . ' ';
 $string .= PHP_EOL . PHP_EOL;
 }
