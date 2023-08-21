@@ -2,11 +2,11 @@
 # run with: python3.9 hist_dydx.py
 # https://dydxprotocol.github.io/v3-teacher/
 
+import os
 from dydx3 import Client
 from dydx3.helpers.request_helpers import json_stringify
 from web3 import Web3
 import json
-# import datetime
 from datetime import date
 from datetime import datetime
 from time import sleep
@@ -16,34 +16,51 @@ def goto(linenum):
     line = linenum
 
 with open('config_dydx.json') as f:
-    data = json.load(f)
+    config = json.load(f)
 
 # append result or rebuild
 append = True
 
 # set arrays and query dates
-if append:
-    with open('db/dydx_txn_hist.json') as f:
-        txn_hist = json.load(f)
-    last_date = max(txn_hist, key=lambda x: datetime.fromisoformat(x['createdAt'][:-1]))
-    txn_last_date = datetime.fromisoformat(last_date['createdAt'][:-1])
-    with open('db/dydx_pay_hist.json') as f:
-        pay_hist = json.load(f)
-    last_date = max(pay_hist, key=lambda x: datetime.fromisoformat(x['effectiveAt'][:-1]))
-    pay_last_date = datetime.fromisoformat(last_date['effectiveAt'][:-1])
-    with open('db/dydx_tran_hist.json') as f:
-        tran_hist = json.load(f)
-    last_date = max(tran_hist, key=lambda x: datetime.fromisoformat(x['createdAt'][:-1]))
-    tran_last_date = datetime.fromisoformat(last_date['createdAt'][:-1])
-    last_date = max(txn_last_date, pay_last_date, tran_last_date)
-else:
-    txn_hist = []
-    pay_hist = []
-    tran_hist = []
-    last_date = datetime(2000,1,1)
+last_date = datetime(2000,1,1).isoformat() + "Z" # this will be the time of the last complete record
+res = {
+'txn_hist': {'data': [], 'file': 'db/dydx_txn_hist.json', 'last_date': last_date, 'last_key': 'createdAt'}
+, 'pay_hist': {'data': [], 'file': 'db/dydx_pay_hist.json', 'last_date': last_date, 'last_key': 'effectiveAt'}
+, 'tran_hist': {'data': [], 'file': 'db/dydx_tran_hist.json', 'last_date': last_date, 'last_key': 'createdAt'}
+, 'positions': {'data': [], 'file': 'db/dydx_positions.json', 'last_date': last_date, 'last_key': 'createdAt'}
+, 'acc_balance': {'data': [], 'file': 'db/dydx_acc_status.json', 'last_date': last_date, 'last_key': ''}
+}
 
-# transaction history
-for acc in data['accounts']:
+# set up data if appending
+for r in res:
+    last_key = res[r]['last_key']
+    if append and last_key != '' and os.path.getsize(res[r]['file']) > 0:
+        with open(res[r]['file']) as f:
+            res[r]['data'] = json.load(f)
+        last_record = max(res[r]['data'], key=lambda x: datetime.fromisoformat(x[last_key][:-1]))
+        res[r]['last_date'] = last_record[last_key]
+        # exceptions for positions data to handle open positions
+        if r == 'positions':
+            last_date = datetime.fromisoformat(res[r]['last_date'][:-1])
+            # get earliest date of open position
+            for record in res[r]['data']:
+                record_date = datetime.fromisoformat(record[last_key][:-1])
+                if record['status'] == 'OPEN' and record_date < last_date:
+                    last_date = record_date
+            # delete if later last_date (open position date or if none open will pass through)
+            reduced_data = []
+            for record in res[r]['data']:
+                record_date = datetime.fromisoformat(record[last_key][:-1])
+                if record['status'] != 'OPEN' and record_date < last_date:
+                    reduced_data.append(record)
+            # store and repeat
+            res[r]['data'] = reduced_data
+            last_record = max(res[r]['data'], key=lambda x: datetime.fromisoformat(x[last_key][:-1]))
+            res[r]['last_date'] = last_record[last_key]
+print('set up arrays, append data =', append, '... querying api for new data')
+
+# iterate accounts
+for acc in config['accounts']:
     private_client = Client(
         host = 'https://api.dydx.exchange',
         api_key_credentials = {
@@ -52,112 +69,68 @@ for acc in data['accounts']:
             'passphrase': acc['api_passphrase']
         }
     )
-    date_limit = f'{datetime.utcnow().isoformat()[:-3]}Z'
-    query_remains = True
-    while query_remains:
-        i = 0
-        response = private_client.private.get_fills(
-            created_before_or_at = date_limit,
-            limit = 100
-        )
-        sleep(0.07)
-        for record in response.data['fills']:
-            record_date = datetime.fromisoformat(record['createdAt'][:-1])
-            if record_date > last_date:
-                record['wallet'] = acc['ethereumAddress']
-                txn_hist.append(record)
-                i += 1
-        if i < 100:
-            query_remains = False
-        else: date_limit = record['createdAt']
-with open('db/dydx_txn_hist.json', 'w') as f:
-    json.dump(txn_hist, f, indent=2)
+    # iterate queries
+    for r in res:
+        last_key = res[r]['last_key']
+        last_date = datetime.fromisoformat(res[r]['last_date'][:-1])
+        date_limit = f'{datetime.utcnow().isoformat()[:-3]}Z'
+        query_remains = True
+        while query_remains:
+            sleep(0.07)
+            i = 0
+            if r == 'txn_hist':
+                response = private_client.private.get_fills(
+                    created_before_or_at = date_limit, limit = 100
+                )
+                data = response.data['fills']
+            if r == 'pay_hist':
+                response = private_client.private.get_funding_payments(
+                    effective_before_or_at = date_limit, limit = 100
+                )
+                data = response.data['fundingPayments']
+            if r == 'tran_hist':
+                response = private_client.private.get_transfers(
+                    created_before_or_at = date_limit, limit = 100
+                )
+                data = response.data['transfers']
+            if r == 'positions':
+                response = private_client.private.get_positions(
+                    created_before_or_at = date_limit, limit = 100
+                )
+                data = response.data['positions']
+            if r == 'acc_balance':
+                response = private_client.private.get_account(
+                    ethereum_address = acc['ethereumAddress']
+                )
+                res[r]['data'].append(
+                    [acc['ethereumAddress'], response.data['account']['freeCollateral']]
+                )
+                query_remains = False
+            else: # if not acc_balance then iterate
+                for record in data:
+                    record_date = datetime.fromisoformat(record[last_key][:-1])
+                    if record_date > last_date:
+                        record['wallet'] = acc['ethereumAddress']
+                        res[r]['data'].append(record)
+                        i += 1
+                if i < 100:
+                    query_remains = False
+                else: date_limit = record[last_key]
 
-# payment history
-for acc in data['accounts']:
-    private_client = Client(
-        host = 'https://api.dydx.exchange',
-        api_key_credentials = {
-            'key': acc['api_key'],
-            'secret': acc['api_secret'],
-            'passphrase': acc['api_passphrase']
-        }
-    )
-    date_limit = f'{datetime.utcnow().isoformat()[:-3]}Z'
-    query_remains = True
-    while query_remains:
-        i = 0
-        response = private_client.private.get_funding_payments(
-            effective_before_or_at = date_limit,
-            limit = 100
-        )
-        sleep(0.07)
-        for record in response.data['fundingPayments']:
-            record_date = datetime.fromisoformat(record['effectiveAt'][:-1])
-            if record_date > last_date:
-                record['wallet'] = acc['ethereumAddress']
-                pay_hist.append(record)
-                i += 1
-        if i < 100:
-            query_remains = False
-        else: date_limit = record['effectiveAt']
-with open('db/dydx_pay_hist.json', 'w') as f:
-    json.dump(pay_hist, f, indent=2)
-
-# transfer history
-for acc in data['accounts']:
-    private_client = Client(
-        host = 'https://api.dydx.exchange',
-        api_key_credentials = {
-            'key': acc['api_key'],
-            'secret': acc['api_secret'],
-            'passphrase': acc['api_passphrase']
-        }
-    )
-    response = private_client.private.get_transfers()
-    sleep(0.07)
-    for record in response.data['transfers']:
-        record['wallet'] = acc['ethereumAddress']
-        tran_hist.append(record)
-with open('db/dydx_tran_hist.json', 'w') as f:
-    json.dump(tran_hist, f, indent=2)
-
-# account balances
-acc_balance = []
-for acc in data['accounts']:
-    private_client = Client(
-        host = 'https://api.dydx.exchange',
-        api_key_credentials = {
-            'key': acc['api_key'],
-            'secret': acc['api_secret'],
-            'passphrase': acc['api_passphrase']
-        }
-    )
-    response = private_client.private.get_account(
-        ethereum_address = acc['ethereumAddress']
-    )
-    sleep(0.07)
-    acc_balance.append(
-        [acc['ethereumAddress'], response.data['account']['freeCollateral']]
-        )
-with open('db/dydx_acc_status.json', 'w') as f:
-    json.dump(acc_balance, f, indent=2)
-
-# account open positions
-positions = []
-for acc in data['accounts']:
-    private_client = Client(
-        host = 'https://api.dydx.exchange',
-        api_key_credentials = {
-            'key': acc['api_key'],
-            'secret': acc['api_secret'],
-            'passphrase': acc['api_passphrase']
-        }
-    )
-    response = private_client.private.get_positions()
-    sleep(0.07)
-    for record in response.data['positions']:
-        record['wallet'] = acc['ethereumAddress']
-        positions.append(record)
-with open('db/dydx_positions.json', 'w') as f:
-    json.dump(positions, f, indent=2)
+# iterate saving
+for r in res:
+    # deduplicate the data
+    dedupe = []
+    for record in res[r]['data']:
+        exist = False
+        for e in dedupe:
+            if record == e:
+                exist = True
+                break
+        if not exist:
+            dedupe.append(record)
+    n_dupe = len(res[r]['data']) - len(dedupe)
+    print('saved', len(dedupe), r, 'records, deduped:', n_dupe)
+    # save
+    with open(res[r]['file'], 'w') as f:
+        json.dump(dedupe, f, indent = 0)
