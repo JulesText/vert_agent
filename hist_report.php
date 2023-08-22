@@ -29,7 +29,7 @@ $dydx = FALSE; # hist_dydx.php to run dydx txn processing functions, hist_dydx.p
 	# $track = ['0x5b5af4b5ab0ed2d39ea27d93e66e3366a01d7aa9','ETH'];
 	$dydx_die = TRUE; # stop after running hist_dydx.php
 $etherscan = FALSE; # hist_etherscan.php to run eth txn processing functions
-	$refresh_txn_hist_eth = TRUE; # refresh transaction history, to generate:
+	$refresh_txn_hist_eth = FALSE; # refresh transaction history, to generate:
 		# eth_txn_hist.json
 		$refresh_period = 'last'; # if refreshing, 'last' to exclude previously-queried blocks, or 'all' for rebuild
 		$refresh_wallets = ['i' => 1, 'n' => 12]; # workaround timeout limit - i) current iteration, n) max wallets per refresh

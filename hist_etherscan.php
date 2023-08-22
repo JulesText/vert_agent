@@ -396,6 +396,15 @@ foreach ($txn_hist as &$row) {
 		$row['Note'] = 'Personal purchase transaction. ' . $row['Note'];
 	}
 
+	# Type: Trade (to balance dust)
+	# treat as Trade
+	# would otherwise be identified as deposit/withdrawal and break rp2
+	# taxable event: yes
+	# identifiers: manually nominate transaction_id
+	else if (in_array($row['transaction_id'], $txn_balance_dust_ids)) {
+		$row['Type'] = 'Trade';
+	}
+
 	# Type: Airdrop
 	# if airdrop identified but type is withdrawal, this record needs to be set as Spend type
 	# taxable event: no
@@ -441,6 +450,20 @@ foreach ($txn_hist as &$row) {
 		# $row['Buy Value in '.$fiat] = 0;
 	}
 
+	# Type: Spend (approval/authorisation)
+	# fees for wallet approvals, authorisations etc
+	# set as type 'Spend'
+	# taxable event: yes disposal
+	# identifiers:
+	# no transaction_id with buy value > 0 or sell value > 0 (sides = 0)
+	# type is withdrawal
+	else if (	($row['t_id_sides'] == 0
+						&& $row['Type'] == 'Withdrawal'
+						&& ($row['Sell Quantity'] == 0 || $row['Sell Quantity'] == '')
+						&& $row['error'] == 0 )
+						| in_array($row['transaction_id'], $approvals)
+					) { $row['Type'] = 'Spend'; }
+
 	# Type: Withdrawal
 	# withdrawal is only for transfers between accounts I own
 	# there should be a corresponding withdrawal for every deposit
@@ -451,19 +474,6 @@ foreach ($txn_hist as &$row) {
 	# withdrawal amount > 0
 	# not failed transaction
 	else if ($row['t_id_sides'] == 1 && $row['Type'] == 'Withdrawal' && $row['error'] == 0) {}
-
-	# Type: Spend (approval/authorisation)
-	# fees for wallet approvals, authorisations etc
-	# set as type 'Spend'
-	# taxable event: yes disposal
-	# identifiers:
-	# no transaction_id with buy value > 0 or sell value > 0 (sides = 0)
-	# type is withdrawal
-	else if (	$row['t_id_sides'] == 0
-						&& $row['Type'] == 'Withdrawal'
-						&& ($row['Sell Quantity'] == 0 || $row['Sell Quantity'] == '')
-						&& $row['error'] == 0
-					) { $row['Type'] = 'Spend'; }
 
 	# Type: Trade
 	# to avoid the complication of matching etherscan withdrawals to deposits
@@ -572,6 +582,40 @@ foreach ($txn_hist as $key => &$row) {
 	}
 }
 unset($row);
+
+# modify transaction_id for rare case when two wallets both have a deposit
+# with the same txn_id, for instance when token is bulk-distributed by server
+# in single transaction to multiple wallets
+
+# all deposit or withdrawal records with a sell or buy asset (not just a fee asset)
+# are selected in Crypto Plan for vert_intra.csv
+# any duplicate transaction_id * Type combinations must be made unique
+
+$temp = [];
+foreach ($txn_hist as $row) {
+	if (
+		in_array($row['Type'], ['Deposit','Withdrawal'])
+		& ($row['Buy Asset'] != '' | $row['Sell Asset'] != '')
+	) {
+		$row['key'] = $row['transaction_id'] . $row['Type'];
+		$temp[] = $row;
+	}
+}
+$intra = [];
+foreach ($temp as $t) {
+	$i = 0;
+	foreach ($temp as $r)
+		if ($t['key'] == $r['key']) $i++;
+	if ($i > 1) {
+		unset($t['key']);
+		foreach ($txn_hist as &$row)
+			if($t == $row) {
+				$row['transaction_id'] .= '_' . $row['Wallet'];
+				break;
+			}
+		unset($row);
+	}
+}
 
 # save
 
