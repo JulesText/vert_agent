@@ -20,15 +20,15 @@ set_time_limit($limittime);
 ini_set('memory_limit', '512M'); # script can use high memory
 	#echo ini_get('memory_limit');die;
 $fiat = $config['base_fiat'];
-$dydx = FALSE; # hist_dydx.php to run dydx txn processing functions, hist_dydx.py used to generate:
+$dydx = TRUE; # hist_dydx.php to run dydx txn processing functions, hist_dydx.py used to generate:
 	# dydx_txn_hist_tidy.json
 	# dydx_balance.json
 	$dedupe_dydx = FALSE; # hist_dydx.py has its own dedupe function
 	$dy_dec = 10; # number of decimal places for dydx txn calculations
-	$track = [FALSE,FALSE]; #track output on screen, can use high memory/time
-	# $track = ['0x5b5af4b5ab0ed2d39ea27d93e66e3366a01d7aa9','ETH'];
-	$dydx_die = TRUE; # stop after running hist_dydx.php
-$etherscan = FALSE; # hist_etherscan.php to run eth txn processing functions
+	$track = [FALSE,FALSE]; #track wallet/asset output on screen, can use high memory/time
+	# $track = ['0x7578af57e2970edb7cb065b066c488bece369c43','MKR'];
+	$dydx_die = FALSE; # stop after running hist_dydx.php
+$etherscan = TRUE; # hist_etherscan.php to run eth txn processing functions
 	$refresh_txn_hist_eth = FALSE; # refresh transaction history, to generate:
 		# eth_txn_hist.json
 		$refresh_period = 'last'; # if refreshing, 'last' to exclude previously-queried blocks, or 'all' for rebuild
@@ -42,9 +42,9 @@ $etherscan = FALSE; # hist_etherscan.php to run eth txn processing functions
 		$refresh_hist_die = TRUE; # show on screen refresh is complete and stop further processing
 	# flow through to generate:
 	# eth_txn_hist_tidy.json
-	$eth_die = TRUE; # stop after end of running hist_etherscan.php
-$audit = FALSE; # hist_audit.php to run audit and print results
-	$reset_balances = TRUE; # for audit, re-query wallet balances to generate:
+	$eth_die = FALSE; # stop after end of running hist_etherscan.php
+$audit = TRUE; # hist_audit.php to run audit and print results
+	$reset_balances = FALSE; # for audit, re-query wallet balances to generate:
 		# balances.json
 		# balance_history.json is not operational
 	# always die() after audit to ensure correct output data file is being produced

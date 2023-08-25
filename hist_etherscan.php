@@ -583,39 +583,43 @@ foreach ($txn_hist as $key => &$row) {
 }
 unset($row);
 
-# modify transaction_id for rare case when two wallets both have a deposit
-# with the same txn_id, for instance when token is bulk-distributed by server
-# in single transaction to multiple wallets
-
-# all deposit or withdrawal records with a sell or buy asset (not just a fee asset)
-# are selected in Crypto Plan for vert_intra.csv
-# any duplicate transaction_id * Type combinations must be made unique
-
-$temp = [];
-foreach ($txn_hist as $row) {
-	if (
-		in_array($row['Type'], ['Deposit','Withdrawal'])
-		& ($row['Buy Asset'] != '' | $row['Sell Asset'] != '')
-	) {
-		$row['key'] = $row['transaction_id'] . $row['Type'];
-		$temp[] = $row;
+# special case where single trade executed via aggregating platform such as matcha
+# can produce separate sub-transactions, which cause issue for dali-rp2 downstream
+# this is better to come after the above fee dedupe
+# get the row counts
+$txn_count = array();
+foreach ($txn_hist as $id => $row) {
+	$key = $row['Wallet'] . '_' . $row['transaction_id'] . '_' . $row['Buy Asset'] . '_' . $row['Sell Asset'];
+	# for dali-rp2 we need Buy Asset and Sell Asset to be singular
+	if ($row['Buy Asset'] != '' | $row['Sell Asset'] != '') {
+		$txn_count[$key]['n']++;
+		$txn_count[$key]['ids'][] = $id;
+		#if ($txn_count[$key]['n'] > 1) echo $txn_count[$key]['n'] . ' ' . $key . PHP_EOL;
+	}
+	else $txn_count[$key]['n'] = '';
+}
+# add the subsequent rows to the first
+$rem_ids = [];
+foreach ($txn_hist as $id => &$row) {
+	$key = $row['Wallet'] . '_' . $row['transaction_id'] . '_' . $row['Buy Asset'] . '_' . $row['Sell Asset'];
+	if ($txn_count[$key]['n'] > 1) {
+		if ($id == $txn_count[$key]['ids'][0]) { # only add to first instance of transactions
+			foreach (['Buy','Sell'] as $side)
+				if ($row[$side.' Asset'] != '') {
+					foreach ($contracts as $arr) # get token decimal places
+						if ($arr['symbol'] == $row[$side.' Asset'])
+							$decimal = $arr['decimal'];
+					foreach ($txn_count[$key]['ids'] as $key_id => $id_cnt) # add subsequent quantities
+						if ($key_id > 0) $row[$side.' Quantity'] = bcadd($row[$side.' Quantity'], $txn_hist[$id_cnt][$side.' Quantity'], $decimal);
+				}
+		} else { # subsequent rows to remove
+			$rem_ids[] = $id;
+		}
 	}
 }
-$intra = [];
-foreach ($temp as $t) {
-	$i = 0;
-	foreach ($temp as $r)
-		if ($t['key'] == $r['key']) $i++;
-	if ($i > 1) {
-		unset($t['key']);
-		foreach ($txn_hist as &$row)
-			if($t == $row) {
-				$row['transaction_id'] .= '_' . $row['Wallet'];
-				break;
-			}
-		unset($row);
-	}
-}
+unset($row); # unset &$row as still accessible
+foreach ($txn_hist as $id => $row) if (in_array($id, $rem_ids)) unset($txn_hist[$id]);
+
 
 # save
 

@@ -66,39 +66,11 @@ $txn_hist = [];
 foreach ($keys_txn as $key) $txn_hist[$key] = '';
 $txn_hist_dydx = [];
 
-# manual enter missing trades
-$txn_manual = [
-	['wallet' => '0x7578af57e2970edb7cb065b066c488bece369c43'
-	,'createdAt' => '2022-04-29T17:43:09.075Z'
-	,'side' => 'SELL'
-	,'market' => 'UMA-USDC'
-	,'price' => 5.4
-	,'size' => 62.5
-	,'fee' => 0.160312
-	]
-	,['wallet' => '0x7578af57e2970edb7cb065b066c488bece369c43'
-	,'createdAt' => '2022-04-29T17:43:09.075Z'
-	,'side' => 'SELL'
-	,'market' => 'UMA-USDC'
-	,'price' => 5.38
-	,'size' => 62.5
-	,'fee' => 0.159718
-	]
-	,['wallet' => '0x7578af57e2970edb7cb065b066c488bece369c43'
-	,'createdAt' => '2022-04-29T17:43:09.075Z'
-	,'side' => 'SELL'
-	,'market' => 'UMA-USDC'
-	,'price' => 5.35
-	,'size' => 62.5
-	,'fee' => 0.158828
-	]
-];
-
 # trades/fills
 
 #$test = [];
 $txn_data = json_decode(file_get_contents('db/dydx_txn_hist.json'));
-$txn_data = array_merge($txn_manual, $txn_data);
+$txn_data = array_merge($txn_manual_dydx, $txn_data);
 echo runtime() . count($txn_data) . ' dydx_txn_hist records read' . PHP_EOL;
 if ($dedupe_dydx) {
 	$txn_data = dedupe_array($txn_data);
@@ -269,22 +241,40 @@ foreach ($keys as $key) {
 	$txn_hist_sum[] = $tx;
 }
 echo runtime() . $i . ' transaction and payment records processed by day' . PHP_EOL;
-echo runtime() . 'result ' . count($txn_hist_sum) . ' transaction and payment records once merged by day' . PHP_EOL;
+$n = count($txn_hist_sum);
+echo runtime() . 'result ' . $n . ' transaction and payment records once merged by day' . PHP_EOL;
+
+# appears several very small interest payments over course of a day
+# can amount to net zero
+$rem_ids = [];
+foreach ($txn_hist_sum as $id => $row) {
+	if (
+		(
+			($row['Buy Quantity'] == 0 & $row['Buy Asset'] != '')
+			| $row['Buy Asset'] == ''
+		) &
+		(
+			($row['Sell Quantity'] == 0 & $row['Sell Asset'] != '')
+			| $row['Sell Asset'] == ''
+		) &
+		(
+			($row['Fee Quantity'] == 0 & $row['Fee Asset'] != '')
+			| $row['Fee Asset'] == ''
+		)
+		) unset($txn_hist_sum[$id]);
+}
+echo runtime() . 'dropped ' . ($n - count($txn_hist_sum)) . ' zero value transaction or payment records' . PHP_EOL;
 
 foreach ($txn_hist_sum as &$txn) {
 	$txn['transaction_id'] = $txn['market'] . '_' . $txn['Timestamp'] . '_' . $txn['wallet_address']; # do not change without tracing dependents
 	if ($txn['Type'] == 'Trade') {
 		$txn['Note'] = 'Trade on dydx ' . $txn['market'] . ' perpetual.';
-		#if ($txn['Buy Quantity'] !== '') $txn['Timestamp'] .= ' 23:59:10'; # timestamp used for sort order later on
-		#else $txn['Timestamp'] .= ' 23:59:30';
 	}
 	if ($txn['Type'] == 'Interest') {
 		$txn['Note'] = 'Interest earned on dydx ' . $txn['market'] . ' perpetual.';
-		#$txn['Timestamp'] .= ' 23:59:50';
 	}
 	if ($txn['Type'] == 'Spend') {
 		$txn['Note'] = 'Interest paid on dydx ' . $txn['market'] . ' perpetual.';
-		#$txn['Timestamp'] .= ' 23:59:55';
 	}
 	$txn['Timestamp'] .= ' 23:59:59';
 }
@@ -296,6 +286,7 @@ if ($dedupe_dydx) {
 	$txn_data = dedupe_array($txn_data);
 	echo count($txn_data) . ' dydx_tran_hist records after dedupe' . PHP_EOL;
 }
+
 foreach ($txn_data as $txn) {
 
 	$t = [];
@@ -445,7 +436,7 @@ foreach ($combos as $combo) {
 			#$txn_position['Timestamp'] = $day . ' 23:59:20';
 			$txn_position['Timestamp'] = $day . ' 23:59:59';
 			$txn_position['Note'] = $case . ' short position on dydx ' . $txn['market'] . ' market.';
-			$txn_position['transaction_id'] = $txn['transaction_id'];
+			$txn_position['transaction_id'] = $txn['transaction_id'] . '_balance_' . $case;
 			$txn_position['wallet_address'] = $txn['wallet_address'];
 			$txn_position['market'] = $txn['market'];
 			$short_positions[] = $txn_position;
@@ -557,7 +548,7 @@ foreach ($combos as $combo) {
 			#$txn_position['Timestamp'] = $day . ' 23:59:40';
 			$txn_position['Timestamp'] = $day . ' 23:59:59';
 			$txn_position['Note'] = $case . ' short position on dydx ' . $txn['market'] . ' market.';
-			$txn_position['transaction_id'] = $txn['transaction_id'];
+			$txn_position['transaction_id'] = $txn['transaction_id'] . '_balance_look_ahead';
 			$txn_position['wallet_address'] = $txn['wallet_address'];
 			$txn_position['market'] = $txn['market'];
 			$short_positions[] = $txn_position;
@@ -573,11 +564,121 @@ $txn_hist_sum = array_merge($txn_hist_sum, $short_positions);
 $recent = 0;
 
 foreach ($txn_hist_sum as &$txn) {
+
 	$txn['time_unix'] = strtotime($txn['Timestamp']);
 	if ($recent < $txn['time_unix']) $recent = $txn['time_unix'];
 	$txn['error'] = '0';
 	unset($txn['market']);
+
+	if ($txn['Type'] == 'Trade') {
+		if (
+			$txn['Buy Asset'] == 'USDC'
+			| (
+				$txn['Sell Asset'] != 'USDC'
+				& $txn['Sell Asset'] != ''
+				)
+			) $txn['transaction_id'] .= "_short";
+		else $txn['transaction_id'] .= "_long";
+	}
+	if ($txn['Type'] == 'Interest') {
+		$txn['transaction_id'] .= '_interest';
+	}
+	if ($txn['Type'] == 'Spend') {
+		$txn['transaction_id'] .= '_interest';
+	}
+
 }
+
+# combine equivalent transaction components identified after the balancing
+$txn_count = array();
+foreach ($txn_hist_sum as $id => $row) {
+	# for dali-rp2 we need Buy Asset and Sell Asset to be singular
+	if (
+		$row['Type'] == 'Trade'
+		& $row['Fee Asset'] == ''
+		) {
+		$key = $row['transaction_id'] . '_' . $row['Buy Asset'] . '_' . $row['Sell Asset'];
+		$txn_count[$key]['n']++;
+		$txn_count[$key]['ids'][] = $id;
+		#if ($txn_count[$key]['n'] > 1) echo $txn_count[$key]['n'] . ' ' . $key . PHP_EOL;
+	} else if (substr($row['transaction_id'], -9) == '_interest') {
+		if ($row['Buy Asset'] != '') $ikey = $row['transaction_id'] . '_' . $row['Buy Asset'];
+		else $ikey = $row['transaction_id'] . '_' . $row['Sell Asset'];
+		$txn_count[$ikey]['n']++;
+		$txn_count[$ikey]['ids'][] = $id;
+		#if ($txn_count[$ikey]['n'] > 1) echo $txn_count[$ikey]['n'] . ' ' . $ikey . PHP_EOL;
+	} else $txn_count[$key]['n'] = '';
+}
+# add/sub the subsequent rows to the first
+$rem_ids = [];
+foreach ($txn_hist_sum as $id => &$row) {
+
+	# case for Trades
+	if ($row['Type'] == 'Trade') $key = $row['transaction_id'] . '_' . $row['Buy Asset'] . '_' . $row['Sell Asset'];
+	else $key = NULL;
+	if ($txn_count[$key]['n'] > 1) {
+		if ($id == $txn_count[$key]['ids'][0]) { # only add to first instance of transactions
+			foreach (['Buy','Sell'] as $side)
+				if ($row[$side.' Asset'] != '') {
+					foreach ($contracts as $arr) # get token decimal places
+						if ($arr['symbol'] == $row[$side.' Asset'])
+							$decimal = $arr['decimal'];
+					foreach ($txn_count[$key]['ids'] as $key_id => $id_cnt) # add subsequent quantities
+						if ($key_id > 0) $row[$side.' Quantity'] = bcadd($row[$side.' Quantity'], $txn_hist_sum[$id_cnt][$side.' Quantity'], $decimal);
+				}
+		} else { # subsequent rows to remove
+			$rem_ids[] = $id;
+		}
+	}
+
+	# case for Interest
+	if (substr($row['transaction_id'], -9) == '_interest') {
+		if ($row['Buy Asset'] != '') $ikey = $row['transaction_id'] . '_' . $row['Buy Asset'];
+		else $ikey = $row['transaction_id'] . '_' . $row['Sell Asset'];
+	} else {
+		$ikey = NULL;
+	}
+
+	if ($txn_count[$ikey]['n'] > 1) {
+		# check if already processed via other txn
+		if (in_array($id, $rem_ids)) continue;
+		# check if larger of interest paid/earned
+		if ($row['Buy Asset'] != '') {
+			$cside = 'Sell'; # txn side is Buy, counter side is Sell
+			$side = 'Buy';
+		} else {
+			$cside = 'Buy';
+			$side = 'Sell';
+		}
+		foreach ($txn_count[$ikey]['ids'] as $id_cnt)
+			if ($id_cnt != $id) {
+				$counter = $txn_hist_sum[$id_cnt][$cside.' Quantity'];
+				$cid = $id_cnt;
+			} else {
+				$qty = $txn_hist_sum[$id_cnt][$side.' Quantity'];
+			}
+		foreach ($contracts as $arr) # get token decimal places
+			if ($arr['symbol'] == $row[$side.' Asset'])
+				$decimal = $arr['decimal'];
+		// echo $id . '_' . $ikey . PHP_EOL;
+		// echo $qty . ' ~ ' . $counter . PHP_EOL;
+		if ($qty > $counter) {
+			// echo $row[$side.' Quantity'] . ' > ' . bcsub($row[$side.' Quantity'], $txn_hist_sum[$cid][$cside.' Quantity'], $decimal) . PHP_EOL;
+			$row[$side.' Quantity'] = bcsub($row[$side.' Quantity'], $txn_hist_sum[$cid][$cside.' Quantity'], $decimal);
+			$rem_ids[] = $cid;
+		} else if ($qty < $counter) {
+			// echo '$rem_id' . PHP_EOL;
+			#$rem_ids[] = $id;
+		} else if ($qty == $counter) {
+			// echo '$rem_id eq' . PHP_EOL;
+			$rem_ids[] = $id;
+		}
+	}
+
+}
+unset($row); # unset &$row as still accessible
+foreach ($txn_hist_sum as $id => $row) if (in_array($id, $rem_ids)) unset($txn_hist_sum[$id]);
+
 $recent = date('Y-m-d', $recent);
 
 # save

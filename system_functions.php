@@ -261,18 +261,21 @@ function objectToArray ($object) {
 
 # populate prices
 
-function fiat_value($address, $timestamp, $quantity, $fiat, $price_records) {
+function fiat_value($address, $timestamp, $quantity, $fiat, $fiat_decimal, $price_records) {
 
 	$result = '';
 
 	# check if price record exists
 	if (isset($price_records[$address][$fiat][$timestamp])) {
 		$price_fiat = $price_records[$address][$fiat][$timestamp]['price'];
-		$result = round($price_fiat * $quantity, 6);
+		// $result = round($price_fiat * $quantity, 6);
+		$price_fiat *= pow(10, $fiat_decimal);
+		$price_fiat = ceil($price_fiat) / pow(10, $fiat_decimal);
+		$result = $price_fiat * $quantity;
 	} else {
 		die(
 			'fatal error: fiat price missing from price_records.json at ' . $timestamp . ' for ' . $address . PHP_EOL
-			. 'try rerunning script to allow prices to update further' 
+			. 'try rerunning script to allow prices to update further'
 		);
 	}
 

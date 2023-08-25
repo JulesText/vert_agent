@@ -88,6 +88,7 @@ $approvals = array(
 	'0xb1663ca442aba925f4dcce35cdd1615212b0c5f0047c08e60d5f476cc52ab272'
 	,'0x3e3d37cf70cd652a69b209dbf2c5c184bf97f5a75bd1fc2a2453a47a08c56602'
 	,'0x98564cad8c575ebda6d992acccbb331a95da6cfd3e4b980ab2e01b5de21311e4'
+	,'0x09af5475635ee3a84d7f267c851cea76382e322d7831ce4a4ad556b2271e9b5d'
 );
 $approvals = array_map('strtolower', $approvals);
 
@@ -123,6 +124,7 @@ $purchases = array(
 	 '0x5a8ef1f166a763ce995f5ac994bad6e3e3d9c1aeff654ad671559716c628aa4f'
 	,'0x47c3634486f84b27089722dc7fab9e8111e0c6a9c49663bae8b83ff8a42c4dbc'
 	,'0x2b11aaa2654f63c666fdd1425fa0239a14c72e4c48ac01e558e05d22a189c0b3'
+	,'0x43b41450cade5a94cd6bfe882e698d37f9611f5dae59e3e5eaecfba73d8d56cb'
 );
 $purchases = array_map('strtolower', $purchases);
 
@@ -137,6 +139,34 @@ $nftnulls = array(
 #
 # transaction balances
 #
+
+# manual enter missing dydx trades
+$txn_manual_dydx = [
+	['wallet' => '0x7578af57e2970edb7cb065b066c488bece369c43'
+	,'createdAt' => '2022-04-29T17:43:09.075Z'
+	,'side' => 'SELL'
+	,'market' => 'UMA-USDC'
+	,'price' => 5.4
+	,'size' => 62.5
+	,'fee' => 0.160312
+	]
+	,['wallet' => '0x7578af57e2970edb7cb065b066c488bece369c43'
+	,'createdAt' => '2022-04-29T17:43:09.075Z'
+	,'side' => 'SELL'
+	,'market' => 'UMA-USDC'
+	,'price' => 5.38
+	,'size' => 62.5
+	,'fee' => 0.159718
+	]
+	,['wallet' => '0x7578af57e2970edb7cb065b066c488bece369c43'
+	,'createdAt' => '2022-04-29T17:43:09.075Z'
+	,'side' => 'SELL'
+	,'market' => 'UMA-USDC'
+	,'price' => 5.35
+	,'size' => 62.5
+	,'fee' => 0.158828
+	]
+];
 
 # note known fee-free transactions
 $fee_free = array(

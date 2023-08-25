@@ -4,6 +4,40 @@
 
 $taxable = array('Spend', 'Trade', 'Staking', 'Interest', 'Mining', 'Dividend', 'Income');
 
+# modify transaction_id for rare case when two wallets both have a deposit
+# with the same txn_id, for instance when token is bulk-distributed by server
+# in single transaction to multiple wallets
+
+# all deposit or withdrawal records with a sell or buy asset (not just a fee asset)
+# are selected in Crypto Plan for vert_intra.csv
+# any duplicate transaction_id * Type combinations must be made unique
+
+$temp = [];
+foreach ($txn_hist as $row) {
+	if (
+		in_array($row['Type'], ['Deposit','Withdrawal','Airdrop'])
+		& ($row['Buy Asset'] != '' | $row['Sell Asset'] != '')
+	) {
+		$row['key'] = $row['transaction_id'] . $row['Type'];
+		$temp[] = $row;
+	}
+}
+$intra = [];
+foreach ($temp as $t) {
+	$i = 0;
+	foreach ($temp as $r)
+		if ($t['key'] == $r['key']) $i++;
+	if ($i > 1) {
+		unset($t['key']);
+		foreach ($txn_hist as &$row)
+			if($t == $row) {
+				$row['transaction_id'] .= '_' . $row['Wallet'];
+				break;
+			}
+		unset($row);
+	}
+}
+
 # some contracts not captured through etherscan
 
 foreach ($con_not_eth as $c) {
@@ -262,7 +296,122 @@ file_put_contents('db/price_history.json', $json);
 
 if (!$running) die('invalid query OR price query timed out [wait 60 seconds]');
 
+#
+# unusual token exceptions
+#
+
+# for uniswap/tokenset pool buy transactions
+# some residual of either of the sell tokens will be returned due to arbitrage
+# however having the residual as an extra buy record causes errors in dali-rp2
+# so balance back as reduction in sell asset
+# get the uniswap txn ids
+/*
+$txn_ids_pool = [];
+foreach ($tokens as $t)
+	if (in_array($t['tksymbol'], ['UNI-V2','UNI-V3-POS'])) {
+		foreach ($txn_hist as $row) {
+			if ($row['Buy Asset'] == $t['symbol'])
+				$txn_ids_uni[$row['transaction_id']][$t['symbol']] = 'Sell'; # if Buy we want Sell
+			if ($row['Sell Asset'] == $t['symbol'])
+				$txn_ids_uni[$row['transaction_id']][$t['symbol']] = 'Buy'; # vice versa
+		}
+	}
+# process
+foreach ($txn_ids_pool as $txn_id => $arr)
+	foreach ($arr as $symbol => $side) {
+		if ($side !== "Sell") continue; # we're after the Buy txn, which is denoted by 'Sell'
+		$symbol_return = NULL;
+		$amount_return = NULL;
+		# identify the returned token and remove the record
+		foreach ($txn_hist as $key => $row)
+			if (
+				$row['transaction_id'] == $txn_id
+				& $row['Buy Asset'] != ''
+				& $row['Buy Asset'] != $symbol
+				) {
+					$symbol_return = $row['Buy Asset'];
+					$amount_return = $row['Buy Quantity'];
+					unset($txn_hist[$key]);
+					#echo $symbol_return . PHP_EOL . $txn_id . PHP_EOL . $amount_return . PHP_EOL;
+					break;
+					}
+		if (!isset($symbol_return)) continue; # in some cases there is no returned asset
+		# update the corresponding sell token record
+		$pass = FALSE;
+		foreach ($txn_hist as &$row)
+			if (
+				$row['transaction_id'] == $txn_id
+				& $row['Sell Asset'] == $symbol_return
+			) {
+				# get token decimal places
+				foreach ($contracts as $key => $arr)
+					if ($arr['symbol'] == $symbol_return)
+						$decimal = $arr['decimal'];
+				# return value
+				#echo $row['Sell Quantity'] . PHP_EOL;
+				$row['Sell Quantity'] = bcsub($row['Sell Quantity'], $amount_return, $decimal);
+				#echo $row['Sell Quantity'] . PHP_EOL;
+				#var_dump($row);
+				$pass = TRUE;
+				break;
+			}
+		unset($row);
+		if (!$pass) {
+			echo $symbol_return . PHP_EOL . $txn_id . PHP_EOL . $amount_return . PHP_EOL;
+			die('err no matching returned asset in uniswap trade');
+		}
+	}
+*/
+
+# combine equivalent transaction components identified after the balancing
+# for dali-rp2 we need Buy Asset and Sell Asset to be singular
+$txn_count = array();
+foreach ($txn_hist as $id => $row) {
+	if ($row['Type'] != 'Trade') continue;
+	if ($row['Buy Asset'] != '' & $row['Sell Asset'] == '' & $row['Fee Asset'] == '') $side = 'Buy';
+	else if ($row['Sell Asset'] != '' & $row['Buy Asset'] == '') $side = 'Sell';
+	else continue; # this txn suggests no consolidation likely
+	$key = $row['transaction_id'] . '_' . $row['Wallet'] . '_' . $row[$side.' Asset'];
+	$txn_count[$key]['n']++;
+	$txn_count[$key]['ids'][] = $id;
+	if ($txn_count[$key]['n'] > 1) echo $txn_count[$key]['n'] . ' ' . $key . PHP_EOL;
+}
+foreach ($txn_count as $id => $row) if ($row['n'] < 2) unset($txn_count[$id]);
+#var_dump($txn_count);die;
+# add the subsequent rows to the first
+$rem_ids = [];
+foreach ($txn_hist as $id => &$row) {
+	if ($row['Type'] != 'Trade') continue;
+	if ($row['Buy Asset'] != '' & $row['Sell Asset'] == '') $side = 'Buy';
+	else if ($row['Sell Asset'] != '' & $row['Buy Asset'] == '') $side = 'Sell';
+	else continue; # this txn suggests no consolidation likely
+	$key = $row['transaction_id'] . '_' . $row['Wallet'] . '_' . $row[$side.' Asset'];
+	if ($txn_count[$key]['n'] > 1) {
+		if ($side == 'Sell') { # only sub from Sell side of transaction
+			foreach ($contracts as $arr) # get token decimal places
+				if ($arr['symbol'] == $row['Sell Asset'])
+					$decimal = $arr['decimal'];
+			# sub buy quantity (should only be 1 buy txn)
+			foreach ($txn_count[$key]['ids'] as $key_id => $id_cnt)  {
+				if ($id_cnt !== $id) {
+					#echo $row['Sell Quantity'] . PHP_EOL;
+					$row['Sell Quantity'] = bcsub($row['Sell Quantity'], $txn_hist[$id_cnt]['Buy Quantity'], $decimal);
+					#echo $row['Sell Quantity'] . PHP_EOL;
+				}
+			}
+
+		} else { # Buy side to remove
+			$rem_ids[] = $id;
+		}
+	}
+}
+unset($row); # unset &$row as still accessible
+foreach ($txn_hist as $id => $row) if (in_array($id, $rem_ids)) unset($txn_hist[$id]);
+
+
+#
 # populate prices
+#
 
 foreach ($txn_hist as &$row) {
 
@@ -275,65 +424,81 @@ foreach ($txn_hist as &$row) {
 
 		if (!$restrict_fiat_value || in_array($row['Type'], $taxable) || $side == 'Fee') {
 
+			if ($row[$side.' Value in '.$fiat] !== '' & $row[$side.' Value in '.$fiat] !== 0 & $row[$side.' Value in '.$fiat] !== 1) {
+				var_dump($row);
+				die;
+			}
+
 			if ($row[$side.' Value in '.$fiat] == '') {
 
-				if ($row[$side.' Quantity'] > 0) {
-				// if ($row['transaction_id'] == '0x871fb67d42f036d5dfb596dcf9fdd0d87858736e8243befea2ed65ca435baba5' && $side == 'Buy') {
-				// 	echo '_contract_address: ' . $row[$side.'_contract_address'] . PHP_EOL
-				// 	. '$timestamp: ' . $timestamp . PHP_EOL
-				// 	. 'Quantity: ' . $row[$side.' Quantity'] . PHP_EOL
-				// 	. '$fiat: '	. $fiat	. PHP_EOL;
-				// }
+				if ($row[$side.' Quantity'] == '0') {
+					$row[$side.' Value in '.$fiat] = 0;
+				} else if ($row[$side.' Quantity'] > 0) {
 
-				$query = TRUE;
-				foreach ($contracts as $key => $arr) {
-					if ($arr['symbol'] == $row[$side.' Asset']) {
-						if ($arr['coingecko']['match'] == 'pool') {
-							$query = FALSE;
-							break;
+					// if ($row['transaction_id'] == 'LUNA-USDC_2022-05-11_0x4b50bfea9c49d01616c73edb9c73421530ffe096_balance_Open_long' && $side == 'Buy') {
+					// 	$address = $row[$side.'_contract_address'];
+					// 	$price_fiat = $price_records[$address][$fiat][$timestamp]['price'];
+					// 	echo $side . '_contract_address: ' . $row[$side.'_contract_address'] . PHP_EOL
+					// 	. '$timestamp: ' . $timestamp . PHP_EOL
+					// 	. 'Quantity: ' . $row[$side.' Quantity'] . PHP_EOL
+					// 	. '$fiat: '	. $fiat	. PHP_EOL
+					// 	. '$price_fiat: ' . $price_fiat . PHP_EOL;
+					// }
+
+					$query = TRUE;
+					foreach ($contracts as $key => $arr) {
+						if ($arr['symbol'] == $row[$side.' Asset']) {
+							if ($arr['coingecko']['match'] == 'pool') {
+								$query = FALSE;
+								break;
+							}
 						}
 					}
+
+					# query price
+					# but don't try querying uniswap pools (V2 or V3) as they don't have prices
+					# also we can have downstream issues in excel and dali
+					# if we have the same asset twice, i.e. sell asset and fee asset are the same,
+					# then we need the same rate spot price, otherwise dali throws error
+					# however because the fee amount is usually much smaller than the purchase, the decimal place accuracy gets lost
+					# so use $fiat_decimal to get matching spot prices downstream, too many decimals creates the error
+					if ($query)
+						$row[$side.' Value in '.$fiat] = fiat_value(
+							$row[$side.'_contract_address'],
+							$timestamp,
+							$row[$side.' Quantity'],
+							$fiat,
+							$fiat_decimal = 2,
+							$price_records
+						);
+
+					}
 				}
-
-				# query price
-				# but don't try querying uniswap pools (V2 or V3) as they don't have prices
-				if ($query)
-					$row[$side.' Value in '.$fiat] = fiat_value(
-						$row[$side.'_contract_address'],
-						$timestamp,
-						$row[$side.' Quantity'],
-						$fiat,
-						$price_records
-					);
-
-			} else if ($row[$side.' Quantity'] == '0') $row[$side.' Value in '.$fiat] = 0;
-			}
-		} else if (
+			} else if (
 				$row[$side.' Quantity'] > 0
 				&& $row[$side.' Value in '.$fiat] == ''
 			) $row[$side.' Value in '.$fiat] = 0;
-
 	}
 }
 unset($row);
 
+#
 # unusual token exceptions
+#
 
 # for uniswap pools, balance values in fiat to other sides
-
-$txn_ids = [];
-
+# tally and process
+$txn_ids_uni = [];
 foreach ($tokens as $t)
 	if (in_array($t['tksymbol'], ['UNI-V2','UNI-V3-POS'])) {
 		foreach ($txn_hist as $row) {
 			if ($row['Buy Asset'] == $t['symbol'])
-				$txn_ids[$row['transaction_id']][$t['symbol']] = 'Sell'; # if Buy we want Sell
+				$txn_ids_uni[$row['transaction_id']][$t['symbol']] = 'Sell'; # if Buy we want Sell
 			if ($row['Sell Asset'] == $t['symbol'])
-				$txn_ids[$row['transaction_id']][$t['symbol']] = 'Buy'; # vice versa
+				$txn_ids_uni[$row['transaction_id']][$t['symbol']] = 'Buy'; # vice versa
 		}
 	}
-
-foreach ($txn_ids as $txn_id => $arr)
+foreach ($txn_ids_uni as $txn_id => $arr)
 	foreach ($arr as $symbol => $side) {
 		# tally the fiat value(s) on the token's opposite side
 		$value_fiat = 0;
@@ -353,7 +518,9 @@ foreach ($txn_ids as $txn_id => $arr)
 		unset($row);
 	}
 
+#
 # trim fields
+#
 
 if (count($keys_out) <> 17) die('error');
 const cols = 17;
