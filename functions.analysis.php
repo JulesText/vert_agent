@@ -2,9 +2,9 @@
 
 /* calculate and save price indicators */
 
-function technical_analysis($config, $pair_id = FALSE) {
+function technical_analysis($config, $pair_id = FALSE, $indicator_list = FALSE) {
 
-	$query = "SELECT DISTINCT pair, period, source, currency, history_start FROM asset_pairs WHERE analyse";
+	$query = "SELECT DISTINCT pair, period, source, currency, history_start, class FROM asset_pairs WHERE analyse";
 	if ($pair_id) $query .= " AND pair_id = " . $pair_id;
 	$pairs = query($query, $config);
 
@@ -13,15 +13,45 @@ function technical_analysis($config, $pair_id = FALSE) {
 	$points_buffer = 200;
 
 	$analysis = array();
+
+	/* technical analysis indicators */
+
 	$rsi = array(8, 12, 24, 36); // 'rsi'.$n
 	$rsiob = 75; // overbought, 'rsi'.$n.'ob'
 	$rsios = 25; // oversold, 'rsi'.$n.'os'
 	$ema = array(6, 12, 26, 50, 100, 200); // 'ema'.$n, crossover upwards 'ema'.$n.'cu', crossover downwards 'ema'.$n.'cd'
 	$roc = array(1, 2, 4, 6, 12, 24); // 'roc'.$n
 	$corr = array(
-		'BTC' => array(50),
-		'ETH' => array(50)
+		'BTC' => array(30,50),
+		'ETH' => array(30,50)
 	); // 'corr'.$n.'btc'
+
+	/* build list */
+
+	if ($indicator_list) {
+
+		$indicators = array('close' => 'close', 'open' => 'open', 'high' => 'high', 'low' => 'low', 'volume' => 'volume');
+		foreach ($rsi as $n) {
+			$indicators['rsi'.$n] = 'RSI ' . $n;
+			$indicators['rsi'.$n.'ob'] =  'RSI ' . $n . ' overbought if RSI > ' . $rsiob . ' (" = 1" to trigger)';
+			$indicators['rsi'.$n.'os'] =  'RSI ' . $n . ' oversold if RSI < ' . $rsios . ' (" = 1" to trigger)';
+		}
+		foreach ($ema as $n) {
+			$indicators['ema'.$n] = 'EMA ' . $n;
+			$indicators['ema'.$n.'cu'] =  'EMA ' . $n . ' cross upwards if prev close < EMA & new close > EMA (" = 1" to trigger)';
+			$indicators['ema'.$n.'os'] =  'EMA ' . $n . ' cross downwards if prev close > EMA & new close < EMA (" = 1" to trigger)';
+		}
+		foreach ($roc as $n) {
+			$indicators['roc'.$n] = 'Rate of Change ' . $n . ' (i.e. "50" for 50%)';
+		}
+		foreach ($corr as $key => $arr) {
+			foreach ($arr as $val)
+				$indicators['corr'.$val.strtolower($key)] = 'Correlation to ' . $key . ' ' . $val;
+		}
+
+		return $indicators;
+
+	}
 
 	foreach ($pairs as $pair) {
 
@@ -44,13 +74,20 @@ function technical_analysis($config, $pair_id = FALSE) {
 
 		$last = $hist[0]['timestamp'] - $period;
 		$missing_data = FALSE;
+		$weekends = weekends($pair['class']);
 		$i = 0;
 		foreach ($hist as $h) {
 			$diff_obs = $h['timestamp'] - $last;
 			if ($period !== $diff_obs) {
+				$day = date('l', $h['timestamp'] / 1000);
+				if (
+					$weekends # asset classes like crypto expect data on weekends, no exception for missing data
+					|| (!$weekends && $day != 'Monday') # classes like fiat or stocks do not expect so allow Sat/Sun missing using test today is Sun/Mon
+				) {
 					$missing_data = TRUE;
 					$missing_obs = $h['timestamp'] - $period;
 					$missing_array = $i;
+				}
 			}
 			$last = $h['timestamp'];
 			$i++;
@@ -124,7 +161,7 @@ function technical_analysis($config, $pair_id = FALSE) {
 
 		foreach ($corr as $key => $array) {
 			$query = "
-				SELECT DISTINCT pair_id, pair, source, currency, history_start FROM
+				SELECT DISTINCT pair_id, pair, source, currency, history_start FROM asset_pairs
 				WHERE analyse
 				AND period = " . $pair['period'] . "
 				AND pair LIKE '%" . $key . "/USD%'
@@ -146,8 +183,9 @@ function technical_analysis($config, $pair_id = FALSE) {
 					foreach ($array as $n) {
 						$r = trader_correl($dc, $cc, $n);
 						for ($i = 0; $i < $count; $i++) {
-							if (isset($r[$i]))
-								$hist[$i]['corr'.$n.$key] = $r[$i];
+							if (isset($r[$i])) {
+								$hist[$i]['corr'.$n.strtolower($key)] = $r[$i];
+							}
 						}
 					}
 				}
@@ -165,6 +203,7 @@ function technical_analysis($config, $pair_id = FALSE) {
 				}
 			}
 			$query .= " WHERE history_id = " . $h['history_id'];
+			if ($config['debug']) echo $query . PHP_EOL;
 			query($query, $config);
 		}
 

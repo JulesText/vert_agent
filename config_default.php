@@ -31,6 +31,11 @@ $config['accept'] = 'application/json';
 $config['content_type'] = 'application/json';
 $config['timestamp'] = (string) milliseconds();
 
+/* email settings */
+
+$config['alert_email_to'] = '';
+$config['alert_email_from'] = '';
+
 /* telegram settings */
 
 // bot name aaaaaa

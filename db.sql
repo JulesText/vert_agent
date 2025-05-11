@@ -13,9 +13,9 @@ CREATE TABLE `assets` (
   `class` enum('crypto','fiat','stock') NOT NULL,
   `investment_id` varchar(128) NOT NULL,
   `investment_proportion` decimal(6,4) NOT NULL,
-  `timestamp` bigint(20) NOT NULL,
+  `timestamp` bigint(20) DEFAULT NULL,
   `financial_year` varchar(9) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
 -- --------------------------------------------------------
 
@@ -26,8 +26,8 @@ CREATE TABLE `assets` (
 CREATE TABLE `asset_pairs` (
   `pair_id` int(11) NOT NULL,
   `pair` varchar(64) NOT NULL,
-  `collect` tinyint(1) NOT NULL DEFAULT '1',
-  `analyse` tinyint(1) NOT NULL DEFAULT '1',
+  `collect` tinyint(1) NOT NULL DEFAULT 1,
+  `analyse` tinyint(1) NOT NULL DEFAULT 1,
   `class` enum('crypto','fiat','stock') DEFAULT NULL,
   `period` int(8) NOT NULL,
   `refresh` int(8) NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE `asset_pairs` (
   `history_end` bigint(20) NOT NULL,
   `source` varchar(64) NOT NULL,
   `reference` varchar(1056) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
 -- --------------------------------------------------------
 
@@ -52,7 +52,7 @@ CREATE TABLE `indicators` (
   `reliability` varchar(256) NOT NULL,
   `class` varchar(32) NOT NULL,
   `parameters` varchar(256) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
 -- --------------------------------------------------------
 
@@ -71,7 +71,7 @@ CREATE TABLE `price_history` (
   `high` decimal(30,20) NOT NULL,
   `low` decimal(30,20) NOT NULL,
   `volume` decimal(30,10) NOT NULL,
-  `imputed` tinyint(1) NOT NULL DEFAULT '0',
+  `imputed` tinyint(1) NOT NULL DEFAULT 0,
   `ema6` decimal(20,10) DEFAULT NULL,
   `ema6cd` tinyint(1) DEFAULT NULL,
   `ema6cu` tinyint(1) DEFAULT NULL,
@@ -108,9 +108,11 @@ CREATE TABLE `price_history` (
   `rsi36` int(2) DEFAULT NULL,
   `rsi36ob` tinyint(1) DEFAULT NULL,
   `rsi36os` tinyint(1) DEFAULT NULL,
+  `corr30btc` decimal(3,2) DEFAULT NULL,
+  `corr30eth` decimal(3,2) DEFAULT NULL,
   `corr50btc` decimal(3,2) DEFAULT NULL,
   `corr50eth` decimal(3,2) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
 -- --------------------------------------------------------
 
@@ -122,9 +124,9 @@ CREATE TABLE `strategies` (
   `strategy_id` int(11) NOT NULL,
   `name` varchar(64) NOT NULL,
   `objective` varchar(4112) NOT NULL,
-  `gain` decimal(5,2) NOT NULL DEFAULT '0.00',
+  `gain` decimal(5,2) NOT NULL DEFAULT 0.00,
   `reflection` varchar(4112) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
 -- --------------------------------------------------------
 
@@ -136,20 +138,21 @@ CREATE TABLE `tactics` (
   `tactic_id` int(11) NOT NULL,
   `strategy_id` int(11) NOT NULL,
   `status` enum('inactive','conditional','actionable','ordered','executed','failed') NOT NULL DEFAULT 'inactive',
-  `refresh` int(8) NOT NULL,
-  `currency` bigint(20) NOT NULL,
-  `action_time_limit` int(8) NOT NULL DEFAULT '1440',
-  `condition_time_test` tinyint(1) NOT NULL DEFAULT '1',
+  `refresh` int(8) NOT NULL DEFAULT 60,
+  `currency` bigint(20) NOT NULL DEFAULT 0,
+  `action_time_limit` int(8) NOT NULL DEFAULT 0,
+  `condition_time_test` tinyint(1) NOT NULL DEFAULT 1,
   `condition_time` bigint(20) DEFAULT NULL,
-  `condition_tactic_test` tinyint(1) NOT NULL DEFAULT '1',
+  `condition_tactic_test` tinyint(1) NOT NULL DEFAULT 1,
   `condition_tactic` int(11) DEFAULT NULL,
-  `condition_pair_test` tinyint(1) DEFAULT '1',
+  `condition_pair_test` tinyint(1) DEFAULT 1,
   `condition_pair_id` int(11) DEFAULT NULL,
   `condition_pair_currency_min` int(8) DEFAULT NULL,
   `condition_pair_indicator` varchar(128) DEFAULT NULL,
   `condition_pair_value_operand` enum('>=','<=','=') DEFAULT NULL,
   `condition_pair_value` decimal(40,20) DEFAULT NULL,
-  `action` enum('delete','limit','market','none') NOT NULL DEFAULT 'none',
+  `action` enum('delete','limit','market','none','alert') NOT NULL DEFAULT 'none',
+  `note` varchar(128) DEFAULT NULL,
   `exchange` char(32) DEFAULT NULL,
   `pair_asset` varchar(64) DEFAULT NULL,
   `from_asset` char(16) DEFAULT NULL,
@@ -159,7 +162,7 @@ CREATE TABLE `tactics` (
   `trade_price` decimal(30,20) DEFAULT NULL,
   `to_fee_max` int(11) DEFAULT NULL,
   `transaction_id` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
 -- --------------------------------------------------------
 
@@ -188,17 +191,17 @@ CREATE TABLE `transactions` (
   `pair_price` decimal(40,20) NOT NULL,
   `from_price_usd` decimal(40,20) DEFAULT NULL,
   `to_price_usd` decimal(40,20) DEFAULT NULL,
-  `price_reference` text,
+  `price_reference` text DEFAULT NULL,
   `fee_amount_usd` decimal(40,20) DEFAULT NULL,
   `price_aud_usd` decimal(40,20) DEFAULT NULL,
-  `aud_usd_reference` text,
+  `aud_usd_reference` text DEFAULT NULL,
   `from_wallet` char(128) DEFAULT NULL,
   `to_wallet` char(128) DEFAULT NULL,
   `tactic_id` int(6) DEFAULT NULL,
   `strategy_id` int(6) NOT NULL,
   `strategy_result_usd` decimal(40,20) DEFAULT NULL,
   `percent_complete` int(11) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
 -- --------------------------------------------------------
 
@@ -209,8 +212,8 @@ CREATE TABLE `transactions` (
 CREATE TABLE `web_content` (
   `content_id` int(11) NOT NULL,
   `source` varchar(64) NOT NULL,
-  `url` text,
+  `url` text DEFAULT NULL,
   `content` text NOT NULL,
   `timestamp` bigint(20) DEFAULT NULL,
-  `notified` int(11) NOT NULL DEFAULT '0'
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+  `notified` int(11) NOT NULL DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;

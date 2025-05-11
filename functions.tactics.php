@@ -16,7 +16,10 @@ function actionable_tactics($config, $tactic_id = FALSE) {
 	foreach ($tactics as $t) {
 
 		# check if time limit for executing action has been exceeded, for instance when order attempts have failed
-		if ($t['currency'] + $t['action_time_limit'] * 60000 < $config['timestamp']) {
+		if (
+			$t['action_time_limit'] != 0
+			&& $t['currency'] + $t['action_time_limit'] * 60000 < $config['timestamp']
+		) {
 
 			$query = "
 				UPDATE tactics SET
@@ -175,6 +178,64 @@ function actionable_tactics($config, $tactic_id = FALSE) {
 
 		}
 
+
+
+		/* if action is to send alert */
+		if ($t['action'] == 'alert') {
+
+			/* get alert details */
+			$query = "
+				SELECT pair, period, source, reference
+				FROM asset_pairs
+				WHERE pair_id = " . $t['condition_pair_id']
+			;
+			$res = query($query, $config);
+			$p = $res[0];
+			$query = "
+				SELECT * FROM price_history
+				WHERE pair = '{$p['pair']}'
+				AND period = '{$config['period'][$p['period']]}'
+				AND source = '{$p['source']}'
+				ORDER BY timestamp DESC
+				LIMIT 1
+			";
+			$res = query($query, $config);
+			$a = $res[0];
+
+			/* write alert */
+			$config['chatText'] = $p['pair'] . " " . $config['period'][$p['period']] . ", source: " . $p['reference'] . PHP_EOL;
+
+			$t['condition_pair_value'] = rtrim(rtrim($t['condition_pair_value'], '0'), '.');
+			$a[$t['condition_pair_indicator']] = rtrim(rtrim($a[$t['condition_pair_indicator']], '0'), '.');
+			$config['chatText'] .= "condition satisfied: " . $t['condition_pair_indicator'] . " " . $t['condition_pair_value_operand'] . " " . $t['condition_pair_value'] . PHP_EOL;
+			$config['chatText'] .= "value: " . $t['condition_pair_indicator'] . " = " . $a[$t['condition_pair_indicator']] . " as at " . date('Y-m-d', $a['timestamp']/1000) . PHP_EOL;
+			$config['chatText'] .= "note: " . $t['note'] . PHP_EOL;
+			$config['chatText'] .= "http://y.jules.net.au/vert_agent_main/alerts.php";
+
+			$sent = alert_email($config);
+
+			# process response of alert
+			if ($sent) {
+
+				$query = "
+					UPDATE tactics SET
+					status = 'inactive',
+					currency = " . $config['timestamp'] . "
+					WHERE tactic_id = '" . $t['tactic_id'] . "'
+				";
+				query($query, $config);
+
+			} else {
+
+				# process response of alert failure
+				$config['chatText'] = 'alert email attempt failed for tactic_id ' . $t['tactic_id'];
+				error_log($config['chatText']);
+
+			}
+
+		}
+
+
 	}
 
 }
@@ -297,11 +358,16 @@ function conditional_tactics($config, $tactic_id = FALSE) {
 					$t['status'] = 'executed';
 				} else {
 					$t['status'] = 'actionable';
-					$config['chatText'] =
-						'trade ready, attempting to ' . $t['action'] .
-						' order for ' . $t['from_asset'] . ' ' . $t['to_asset'] .
-						' on ' . $t['exchange'];
-					telegram($config);
+					if ($t['action'] == 'alert') {
+						$config['chatText'] = 'alert condition met, preparing to email';
+						echo $config['chatText'] . PHP_EOL;
+					} else {
+						$config['chatText'] =
+							'trade ready, attempting to ' . $t['action'] .
+							' order for ' . $t['from_asset'] . ' ' . $t['to_asset'] .
+							' on ' . $t['exchange'];
+						telegram($config);
+					}
 				}
 			}
 

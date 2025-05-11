@@ -113,3 +113,26 @@ function count_on_weekends($from, $to, $period_ms) {
 	return $wmiss;
 
 }
+
+/* email alert */
+
+function alert_email($config) {
+
+	$subject = 'Vert agent alert';
+	$headers = 'From: ' . $config['alert_email_from'];
+
+	try {
+		if (!mail($config['alert_email_to'], $subject, $config['chatText'], $headers)) {
+				throw new Exception('Failed to send email alert');
+		} else {
+		    echo 'Email alert sent successfully.';
+				return TRUE;
+		}
+  } catch (Exception $e) {
+		$msg = 'An email alert error occurred: ' . $e->getMessage();
+		echo $msg;
+		error_log($msg);
+		return FALSE;
+  }
+
+}

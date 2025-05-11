@@ -391,7 +391,7 @@ function price_history($config, $pair_id = FALSE) {
 	$pairs = query($query, $config);
 
 	# check if any results
-	if (empty($pairs)) echo 'current';
+	if (empty($pairs)) echo 'price_history current' . PHP_EOL;
 	else
 	# process each result
 	foreach ($pairs as $pair) {
@@ -543,7 +543,9 @@ function price_recent($config, $pair_id = FALSE) {
 	if ($pair_id) $query .= " AND pair_id = " . $pair_id;
 	$pairs = query($query, $config);
 
-	if (empty($pairs)) echo 'current';
+	if ($config['debug']) echo $query . PHP_EOL;
+
+	if (empty($pairs)) echo 'price_history current' . PHP_EOL;
 	else
 	foreach ($pairs as $pair) {
 
