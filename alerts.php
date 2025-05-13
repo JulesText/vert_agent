@@ -133,7 +133,10 @@ foreach ($alerts as $key => $r) {
                 if ($pairs != 0) {
                   echo "<option value=''>--</option>";
                   foreach ($pairs as $row) {
-                      echo "<option value='".$row['pair_id']."' ".($pair_id_load == $row['pair_id'] ? 'selected' : '').">".$row['pair']." ".$config['period'][$row['period']]." (" . $row['reference'] . ")"."</option>";
+                      echo "<option value='".$row['pair_id']."' ".($pair_id_load == $row['pair_id'] ? 'selected' : '').">"
+                      .$row['pair']." "
+                      .$config['period'][$row['period']]
+                      ."</option>";
                   }
                 } else {
                     echo "<option value=''>No asset pairs available</option>";
@@ -205,7 +208,7 @@ foreach ($alerts as $key => $r) {
     </table>
 
     <?php
-      echo "<h2>Data {$pair_load['pair']} {$config['period'][$pair_load['period']]}";
+      echo "<h2>Data {$pair_load['pair']} {$config['period'][$pair_load['period']]}</h2>Source: {$pair_load['reference']}";
     ?>
 
     <table border="1">

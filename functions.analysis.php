@@ -82,7 +82,7 @@ function technical_analysis($config, $pair_id = FALSE, $indicator_list = FALSE) 
 				$day = date('l', $h['timestamp'] / 1000);
 				if (
 					$weekends # asset classes like crypto expect data on weekends, no exception for missing data
-					|| (!$weekends && $day != 'Monday') # classes like fiat or stocks do not expect so allow Sat/Sun missing using test today is Sun/Mon
+					|| (!$weekends && !in_array($day, ['Sunday','Monday'])) # classes like fiat or stocks do not expect so allow Sat/Sun missing using test today is Sun/Mon
 				) {
 					$missing_data = TRUE;
 					$missing_obs = $h['timestamp'] - $period;
